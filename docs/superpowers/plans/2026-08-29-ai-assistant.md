@@ -19,8 +19,8 @@ Copied verbatim from spec — every task inherits these:
 - DB-authoritative chat; `GET /api/meta/models` key-gated; collections `assistantConversations`, `assistantMessages`, `assistantPresets`; `_id` everywhere.
 - STT Addis-only, ≤60s segments, ffmpeg split/merge via `child_process.execFile`, `FFMPEG_PATH`/`FFPROBE_PATH`.
 - Composer: X-Chat store, forwardRef wrapper `focusInput()`/`replaceContent(text)`, no RHF. RHF forms: `register` always; `Controller` only when impractical; `watch`/`useWatch`/`useFormState` banned.
-- No deprecated MUI props; frozen `config/env.js` + `utils/constants.js`; Winston only (no console.log backend); arrow functions; kebab-case modules; PascalCase one-export components; `Mui*` in `client/src/components/reusable/`; no barrel files; JSDoc; envelope `{success,message,data}`; pagination `{docs,page,limit,totalDocs,totalPages}`; plain error messages; keys only in `backend/.env` (+ `.env.example`).
-- Branch protocol: `phase-N-description`; **start of every phase = Deep analysis: read the entire codebase without skipping, build super deep understanding, log drift/surprises in `progress.md` before coding**; then exec uncommitted → review → `feat: phase N …` → push → merge → delete. No amend after push. `node --check` backend; `vite build` 0 errors + `dist/` deleted.
+- No deprecated MUI props; frozen `config/env.js` + `utils/constants.js`; Winston only (no console.log backend); arrow functions (exception: class ctors, generators, mongoose `this`-binding hooks); **no unused imports/variables (exception: framework-required params like error-handler `next`)**; kebab-case modules; PascalCase one-export components; `Mui*` in `client/src/components/reusable/`; no barrel files; JSDoc; envelope `{success,message,data}`; pagination `{docs,page,limit,totalDocs,totalPages}`; plain error messages; keys only in `backend/.env` (+ `.env.example`).
+- Branch protocol: `phase-N-description`; **start of every phase = Deep analysis: read the entire codebase without skipping, build super deep understanding, log drift/surprises in `progress.md` before coding**; then exec uncommitted → review → `feat: phase N …` → push → merge → delete. No amend after push. `node --check` backend; `vite build` 0 errors + `dist/` deleted. STRICT rules: JSDoc everywhere; arrow functions only (class ctors/generators/mongoose-`this` hooks excepted); no unused imports/variables (framework-required params excepted).
 
 ---
 
@@ -68,7 +68,7 @@ Copied verbatim from spec — every task inherits these:
 
 ## Phase 2 — Data & APIs
 
-- [ ] **Step 0: DEEP ANALYSIS** — read the entire codebase without skipping a single thing; build super deep understanding of every file/responsibility/relationship; verify against spec + plan; log drift/surprises in `progress.md` BEFORE writing code.
+- [x] **Step 0: DEEP ANALYSIS** — read the entire codebase without skipping a single thing; build super deep understanding of every file/responsibility/relationship; verify against spec + plan; log drift/surprises in `progress.md` BEFORE writing code.
 
 **Files:**
 - Create: `backend/src/routes/conversationRoutes.js`, `messageRoutes.js`, `presetRoutes.js`
@@ -81,12 +81,12 @@ Copied verbatim from spec — every task inherits these:
 - Controllers return envelope via `res.json({ success:true, message:…, data })`.
 - Errors: thrown `AppError(message, status)` → handled by `errorHandler`.
 
-- [ ] **Step 1:** `conversationController` — list (paginated), create, update, delete (soft delete flag if decided; default: hard delete + cascade messages via `deleteMany`).
-- [ ] **Step 2:** `messageController` — list messages for conversationId (paginated, populated conversation ref check).
-- [ ] **Step 3:** `presetController` — CRUD.
-- [ ] **Step 4:** validators via `express-validator` — title/prompt required; conversationId ObjectId; model ids validated against catalog on conversation create/update.
-- [ ] **Step 5:** mount routes; wire `validate.js` helper to return 400 envelope on validation failure.
-- [ ] **Step 6: Validate** — `node --check`; boot; curl smoke: create conversation, post message, patch, delete, list paginated.
+- [x] **Step 1:** `conversationController` — list (paginated), create, update, delete (does NOT soft delete; hard delete + cascade deleteMany by design).
+- [x] **Step 2:** `messageController` — list messages for conversationId (paginated, conversation exists check).
+- [x] **Step 3:** `presetController` — CRUD.
+- [x] **Step 4:** validators via `express-validator` — title/prompt required; conversationId ObjectId; model ids validated against catalog on conversation create/update (catalog=Phase 3; here length + required only).
+- [x] **Step 5:** mount routes; wire `validate.js` helper to return 400 envelope on validation failure.
+- [x] **Step 6: Validate** — `node --check`; boot; curl smoke: create conversation, post message, patch, delete, list paginated.
 - [ ] **Step 7: STOP for review** → commit phase 2, push, merge, delete branch.
 
 ---
