@@ -56,8 +56,8 @@
 - [x] Validate: `node --check`; boot; smoke (19/19 curl checks) — done
 - [x] STOP → reviewed → committed `feat: phase 2 …` → merged to main → branch deleted
 
-### Phase 3 — AI providers + STT
-**Status:** in_progress (implementation + validation done; awaiting review/commit)
+### Phase 3 — AI providers + STT ✅ DONE
+**Status:** completed
 - [x] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
 - [x] Provider catalog (`providerCatalog.js`: frozen defs, key-gated availability, key-independent `getModelInfo`) + `GET /api/meta/models` key-gating (only keyed providers listed)
 - [x] `addis` (SDK), `gemini` (REST `generateContent`), `openAiCompat` factory (nvidia/groq/openrouter) adapters → normalize `{ content, reasoning, model }`; `providerErrors` mapper (429/402 surfaced, 5xx genericized)
@@ -66,8 +66,8 @@
 - [x] STT: multer 25MB upload → ffprobe/ffmpeg → mono-16k WAV → ≤60s split/merge → sequential Addis transcribe → cleanup
 - [x] LIVE model corrections: gemini `2.5-flash` retired → `gemini-3.6-flash` + `thinkingLevel`; nvidia `meta/llama-3.3-70b-instruct` EOL (410) → `openai/gpt-oss-120b`
 - [x] Validate: `node --check`; boot; `/api/meta/models` (groq/openrouter hidden); real `/api/chat`; STT 2s + 65s tone + real 187.7s Amharic webm (200 in 33s); cross-model comparison (gemini 4 efforts + gpt-oss-120b + addis)
-- [x] Strict validation: every backend file read top-to-bottom (findings in `progress.md`; fixes PENDING approval: addis STT `baseURL`, dead `OVERLAP_SECONDS`, gemini empty-parts guard)
-- [ ] STOP for review → commit → push → merge → delete branch
+- [x] Strict validation: every backend file read top-to-bottom (findings in `progress.md`); approved fixes applied: addis STT `baseURL`, dead `OVERLAP_SECONDS` removed, gemini empty-parts guard
+- [x] STOP → reviewed → committed `feat: phase 3 ai providers & stt …` (`a017ecd`) → merged to main (`ade9cfa`) → pushed → branch deleted
 
 ### Phase 4 — Chat UI
 **Status:** pending
@@ -121,9 +121,9 @@
 |-------|---------|------------|
 | NVIDIA `meta/llama-3.3-70b-instruct` → 410 Gone (EOL 2026-08-26) | kept model | account probe (nemotron/chatqa/mistral 404; llama-3.2 vision + gpt-oss 200) → catalog switched to `openai/gpt-oss-120b` |
 | Gemini `gemini-2.5-flash` rejected (retired for new users) | kept model | switched to `gemini-3.6-flash` + `thinkingConfig.thinkingLevel` |
-| `addisSttService` client ignores `ADDIS_AI_BASE_URL` (chat adapter honors it) | — | one-line fix pending user approval before commit |
+| `addisSttService` client ignores `ADDIS_AI_BASE_URL` (chat adapter honors it) | passed baseURL to STT client | fixed in `a017ecd` |
 
 ## Next Step
-Apply approved strict-validation fixes (addis STT `baseURL`, remove dead `OVERLAP_SECONDS`, gemini empty-parts guard), re-run `node --check`, then present Phase 3 for review → commit `feat: phase 3 ai providers & stt …` → push → merge → delete `phase-3-ai` → start Phase 4 (Chat UI) with mandatory deep-analysis Step 0.
+Phase 3 shipped (commit `a017ecd`, merge `ade9cfa`). Start **Phase 4 — Chat UI**: create `phase-4-chat-ui` branch from `main`, run the mandatory deep-analysis Step 0 (read the entire codebase + spec/plan, log findings in `progress.md`), then scaffold `client/`.
 
 <｜DSML｜parameter name="lazy" string="false">true

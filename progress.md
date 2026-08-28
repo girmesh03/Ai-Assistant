@@ -72,7 +72,7 @@ Deep analysis complete → implementing Phase 2.
 | Smoke `PATCH {presetId}` read-back returned 400 (no-fields guard works as designed) | Reused `PATCH {}` as a read | Fixed smoke step to verify via `GET /api/conversations` list — passed |
 | NVIDIA `meta/llama-3.3-70b-instruct` → 410 Gone (EOL 2026-08-26) | kept model | account probe → catalog switched to `openai/gpt-oss-120b` (details in Phase 3 add-on section) |
 | Gemini `gemini-2.5-flash` rejected (retired for new users) | kept model | switched to `gemini-3.6-flash` + `thinkingConfig.thinkingLevel` (details in Phase 3 add-on section) |
-| `addisSttService` client ignores `ADDIS_AI_BASE_URL` (chat adapter honors it) | — | one-line fix pending user approval before commit (see strict-validation findings below) |
+| `addisSttService` client ignores `ADDIS_AI_BASE_URL` (chat adapter honors it) | passed `baseURL` to STT client | fixed in `a017ecd` (see Phase 3 shipped section below) |
 
 ## 2026-08-29 — Phase 2 shipped + Phase 3: Deep Analysis (Step 0)
 
@@ -125,3 +125,10 @@ Deep analysis complete → implementing Phase 2.
   5. Known edge (no action): empty-string `ADDIS_AI_BASE_URL` bypasses the `??` fallback; `||` would harden it.
 - **Confirmed deliberate behaviors:** partial provider-only PATCH → generic 400 (provider+model must change together); `body('content').trim()` means stored user content is trimmed; empty `systemPrompt`/`persona` normalized to `null`; trimmed presets/titles. Whisper-split choice: short recordings are still ffmpeg-normalized (SDK gets valid WAV regardless of source container).
 - `task_plan.md` re-synced to match reality (providers/models list, Phase 3 status, Decisions/Errors tables, Next Step).
+
+## 2026-08-29 — Phase 3 reviewed, fixes applied, shipped
+
+- **Approved strict-validation fixes applied:** ① `addisSttService.js` STT client now passes `baseURL: env.addis.baseUrl` (parity with chat); ② removed dead `STT.OVERLAP_SECONDS` constant; ③ `geminiProvider` guards with `!candidate?.content?.parts?.length` (empty `[]` now 502 instead of storing `""`).
+- **Revalidation:** `node --check` on all backend JS: 0 fails. Boot green: `MongoDB connected` + listening 4000; `GET /` health envelope; `GET /api/meta/models` returns exactly the 3 keyed providers (addis `addis-1-alef`, gemini `gemini-3.6-flash`, nvidia `openai/gpt-oss-120b`; groq/openrouter hidden — correct). Server killed; no `:4000` listener left.
+- **Shipped:** committed `feat: phase 3 ai providers & stt …` (`a017ecd`), merged `--no-ff` into `main` (`ade9cfa`), pushed `origin/main` `fb5aea3..ade9cfa`, deleted `phase-3-ai` (local + remote). Working tree clean on `main`.
+- Next: **Phase 4 — Chat UI** (branch `phase-4-chat-ui`, mandatory deep-analysis Step 0 first).
