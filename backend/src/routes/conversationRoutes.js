@@ -46,6 +46,16 @@ const createConversationValidators = [
     .isIn(constants.REASONING_LEVELS)
     .withMessage('Invalid reasoning effort'),
   body('language').optional({ values: 'falsy' }).isIn(constants.LANGUAGES).withMessage('Invalid language'),
+  body('systemPrompt')
+    .optional()
+    .trim()
+    .isLength({ max: constants.CHAT.SYSTEM_PROMPT_MAX_LENGTH })
+    .withMessage(`System prompt must be ${constants.CHAT.SYSTEM_PROMPT_MAX_LENGTH} characters or fewer`),
+  body('persona')
+    .optional()
+    .trim()
+    .isLength({ max: constants.CHAT.PERSONA_MAX_LENGTH })
+    .withMessage(`Persona must be ${constants.CHAT.PERSONA_MAX_LENGTH} characters or fewer`),
   body('presetId').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid preset ID'),
 ];
 
@@ -82,6 +92,16 @@ const updateConversationValidators = [
     .isIn(constants.REASONING_LEVELS)
     .withMessage('Invalid reasoning effort'),
   body('language').optional({ values: 'falsy' }).isIn(constants.LANGUAGES).withMessage('Invalid language'),
+  body('systemPrompt')
+    .optional()
+    .trim()
+    .isLength({ max: constants.CHAT.SYSTEM_PROMPT_MAX_LENGTH })
+    .withMessage(`System prompt must be ${constants.CHAT.SYSTEM_PROMPT_MAX_LENGTH} characters or fewer`),
+  body('persona')
+    .optional()
+    .trim()
+    .isLength({ max: constants.CHAT.PERSONA_MAX_LENGTH })
+    .withMessage(`Persona must be ${constants.CHAT.PERSONA_MAX_LENGTH} characters or fewer`),
   body('presetId').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid preset ID'),
 ];
 

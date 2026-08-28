@@ -8,6 +8,9 @@ import { httpStatus } from './utils/httpStatus.js';
 import { conversationRoutes } from './routes/conversationRoutes.js';
 import { messageRoutes } from './routes/messageRoutes.js';
 import { presetRoutes } from './routes/presetRoutes.js';
+import { metaRoutes } from './routes/metaRoutes.js';
+import { chatRoutes } from './routes/chatRoutes.js';
+import { speechRoutes } from './routes/speechRoutes.js';
 
 /**
  * The Express application: CORS, JSON parsing, dev request logging, the
@@ -44,6 +47,9 @@ app.get('/', healthHandler);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/conversations', messageRoutes);
 app.use('/api/presets', presetRoutes);
+app.use('/api/meta', metaRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/speech', speechRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
