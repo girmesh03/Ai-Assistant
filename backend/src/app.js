@@ -4,6 +4,10 @@ import morgan from 'morgan';
 import { env } from './config/env.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { httpStatus } from './utils/httpStatus.js';
+import { conversationRoutes } from './routes/conversationRoutes.js';
+import { messageRoutes } from './routes/messageRoutes.js';
+import { presetRoutes } from './routes/presetRoutes.js';
 
 /**
  * The Express application: CORS, JSON parsing, dev request logging, the
@@ -28,7 +32,7 @@ if (env.nodeEnv === 'development') {
  * @returns {void}
  */
 const healthHandler = (req, res) => {
-  res.status(200).json({
+  res.status(httpStatus.OK).json({
     success: true,
     message: 'Ai-Assistant API',
     data: { name: 'ai-assistant-backend', version: '0.1.0' },
@@ -36,6 +40,10 @@ const healthHandler = (req, res) => {
 };
 
 app.get('/', healthHandler);
+
+app.use('/api/conversations', conversationRoutes);
+app.use('/api/conversations', messageRoutes);
+app.use('/api/presets', presetRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

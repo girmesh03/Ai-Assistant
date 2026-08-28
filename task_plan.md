@@ -21,6 +21,7 @@
 - **Composer (X-Chat store-driven):** `forwardRef` wrapper `MuiChatComposer` exposing `focusInput()`/`replaceContent(text)` (→ `setValue` + focus). No react-hook-form in composer. For all RHF forms (preset dialog): `register` always; `Controller` only when `register` is genuinely impractical (documented exceptions); `watch`/`useWatch`/`useFormState` banned.
 - **STRICT — JSDoc everywhere:** every function, method, and class gets a JSDoc block (`/** @param {type} name — meaning · @returns {type} meaning */`). No bare function without a doc block. Modules that export no functions carry a module-header comment.
 - **STRICT — Arrow functions only:** all functions are declared as `const name = (...) => { … }`. Narrow exceptions where an arrow cannot be used: class constructors, generator functions (`function*`), and Mongoose schema methods/hooks/plugins that bind `this`.
+- **STRICT — No unused imports/variables:** every import and every declared variable must be used; remove dead bindings. Exception: parameters a framework requires by signature (Express error-handler `next`).
 - **Conventions:** no deprecated MUI props (v9 slot form + `slotProps={{ paper:… }}`); no magic values (`utils/constants.js` frozen UPPER_SNAKE + `config/env.js` frozen); no `console.log` backend (Winston only); arrow functions (mongoose hooks/methods/constructors excepted); kebab-case JS modules, PascalCase one-export React components, `Mui*` prefix in `client/src/components/reusable/`, no barrel files; JSDoc on functions; `express-async-handler`; provider routes kebab-case; envelope `{ success, message, data }`; pagination `{ docs, page, limit, totalDocs, totalPages }` via mongoose-paginate-v2; plain end-user error messages; keys only in `backend/.env` + `.env.example` committed.
 - **Protocol:** per-phase branch (`phase-N-description`), never commit to main. **Every phase starts with DEEP ANALYSIS: read the entire codebase without skipping a single thing, build a super deep understanding of each file's responsibility and module relationships, verify consistency against the spec/plan, and log any drift/surprises in `progress.md` BEFORE writing code.** Then execute uncommitted → user review → explicit approval → `feat: phase N …` commit → push → merge → delete branch. `chore:` for hardening. No amend after push. Validation: `node --check` on backend JS; `vite build` 0 errors + `dist/` deleted; curl smoke; manual E2E record→transcribe→submit.
 - **Open items (user to decide later):** visual identity direction + default theme mode. Theme = token-driven single file so it's a one-file change.
@@ -44,14 +45,16 @@
 - [ ] **STOP for user review → commit `feat: phase 1 foundations …` → push → merge → delete branch**
 
 ### Phase 2 — Data & APIs
-**Status:** pending
-- [ ] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
-- Conversation CRUD (`GET|POST /api/conversations`, `PATCH|DELETE /:id`)
-- Messages read (paginated `GET /api/conversations/:id/messages`)
-- Preset CRUD (`GET|POST /api/presets`, `PATCH|DELETE /:id`)
-- `express-validator` everywhere + error middleware + 404
-- Validate: `node --check`; curl CRUD smoke
-- STOP for review → commit → push → merge → delete branch
+**Status:** in_progress (implemented; awaiting review)
+- [x] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
+- [x] Conversation CRUD (`GET|POST /api/conversations`, `PATCH|DELETE /:id`)
+- [x] Messages read (paginated `GET /api/conversations/:id/messages`)
+- [x] Preset CRUD (`GET|POST /api/presets`, `PATCH|DELETE /:id`)
+- [x] `express-validator` everywhere + `middleware/validate.js` 400 helper + 404
+- [x] Shared pagination (`utils/pagination.js`: validators, payload, resolvePage/Limit); `utils/pickFields.js`
+- [x] Delete cascades: conversation → messages; preset → `$unset` presetId on conversations
+- [x] Validate: `node --check`; boot; smoke (19/19 curl checks) — done
+- [ ] **STOP for user review → commit phase 2 → push → merge → delete branch**
 
 ### Phase 3 — AI providers + STT
 **Status:** pending
@@ -102,6 +105,7 @@
 | 13 | Mongo connect: infinite exponential-backoff retry (1s→30s, factor 2, serverSelectionTimeoutMS 5000) | User instruction |
 | 14 | STRICT: JSDoc everywhere (functions/methods/classes; module headers for others) | User instruction |
 | 15 | STRICT: arrow functions only (exceptions: class ctors, generators, moongoose `this`-binding hooks) | User instruction |
+| 16 | STRICT: no unused imports/variables (exception: framework-required params like error-handler `next`) | User instruction |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
