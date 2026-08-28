@@ -16,6 +16,8 @@ const conversationSchema = new mongoose.Schema(
     modelId: { type: String, required: true },
     reasoningEffort: { type: String, enum: constants.REASONING_LEVELS, default: constants.DEFAULT_REASONING_LEVEL },
     language: { type: String, enum: constants.LANGUAGES, default: constants.DEFAULT_LANGUAGE },
+    systemPrompt: { type: String, trim: true, maxlength: constants.CHAT.SYSTEM_PROMPT_MAX_LENGTH, default: null },
+    persona: { type: String, trim: true, maxlength: constants.CHAT.PERSONA_MAX_LENGTH, default: null },
     presetId: { type: mongoose.Schema.Types.ObjectId, ref: 'Preset', default: null },
   },
   { collection: 'assistantConversations', timestamps: true }

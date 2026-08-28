@@ -22,12 +22,27 @@ export const constants = Object.freeze({
     MAX_LIMIT: 100,
   }),
 
+  /** Chat-turn limits and per-conversation system/persona length caps. */
+  CHAT: Object.freeze({
+    MAX_CONTEXT_MESSAGES: 50,
+    MAX_MESSAGE_LENGTH: 32000,
+    SYSTEM_PROMPT_MAX_LENGTH: 4000,
+    PERSONA_MAX_LENGTH: 2000,
+  }),
+
+  /** Server-side generation defaults forwarded to every provider. */
+  GENERATION: Object.freeze({
+    DEFAULT_TEMPERATURE: 0.7,
+    ADDIS_MAX_TOKENS: 4096,
+    GEMINI_MAX_OUTPUT_TOKENS: 8192,
+    COMPAT_MAX_TOKENS: 4096,
+  }),
+
   /** Voice-input pipeline limits and ffmpeg split behavior. */
   STT: Object.freeze({
     MAX_UPLOAD_BYTES: 25 * 1024 * 1024,
     MIN_DURATION_SECONDS: 1,
     MAX_SEGMENT_SECONDS: 60,
-    OVERLAP_SECONDS: 1,
     MAX_RECORDING_SECONDS: 300,
   }),
 

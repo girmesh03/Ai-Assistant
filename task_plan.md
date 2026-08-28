@@ -16,8 +16,8 @@
 - **Never read/use these paths:** `C:/Users/girma/Desktop/beza/addis-ai-stt-api/addis_ai_chat.py`, `C:/Users/girma/Desktop/beza/glm52-test/`. Addis + providers come from official docs/SDKs (`addisai` SDK) only.
 - **Scaffolding:** backend package.json via `npm init -y` + `npm pkg set type=module` + `npm install …`. Client via `npm create vite@latest client -- --template react` + `npm install …`. Never hand-write package.json. Lockfiles committed with their phase. Never commit `backend/.env` or any secrets.
 - **Architecture:** DB-authoritative chat; `GET /api/meta/models` returns only providers with a present key in `backend/.env`. Collection names explicit: `assistantConversations`, `assistantMessages`, `assistantPresets` (MONGO_URI points at db `report-builder-v2` verbatim). `_id` everywhere (never `.id`).
-- **Providers:** addis (addis-1-alef, SDK), gemini (2.5-flash w/ configurable thinkingBudget 0/1024/4096/16384; 2.0-flash), nvidia (meta/llama-3.3-70b-instruct), groq (qwen/qwen3-32b reasoning_effort none/default + reasoning_format parsed; llama-3.1-8b-instant), openrouter (deepseek-r1:free; llama-3.3-70b-instruct:free). One shared `openaiCompat` service (axios) for nvidia/groq/openrouter. Reasoning effort levels: Off/Low/Medium/High (per-conversation default + per-message override).
-- **STT:** Addis AI only; ≤60s segments via ffmpeg split; sequential transcribe; merge. multer memory upload (25MB cap), ~300s soft recording cap. `child_process.execFile` (no new dep). Paths from `FFMPEG_PATH`/`FFPROBE_PATH`. Pipelines cleanup in `finally`.
+- **Providers (as implemented):** addis (`addis-1-alef`, SDK, no reasoning), gemini (`gemini-3.6-flash`, REST `generateContent`, reasoning via `thinkingConfig.thinkingLevel` off→minimal/low→low/medium→medium/high→high; **`gemini-2.5-flash` retired for new users**), nvidia (`openai/gpt-oss-120b`; **`meta/llama-3.3-70b-instruct` EOL since 2026-08-26 → 410 Gone**), groq (`qwen/qwen3-32b`, `reasoning_format:"parsed"` + `reasoning_effort`; off→`hidden`+`none`), openrouter (`deepseek/deepseek-r1:free`). One shared `openaiCompat` adapter factory (axios) for nvidia/groq/openrouter with injectable `buildReasoningParams`. Reasoning levels: Off/Low/Medium/High (per-conversation default + per-message override). Every adapter receives the conversation's `systemPrompt`/`persona`; generation params = server defaults (`GENERATION`: temperature 0.7; addis/compat max_tokens 4096; gemini 8192).
+- **STT:** Addis AI only; ffprobe duration gate (reject <1s and >300s → 400); normalize to mono 16k WAV; ≤60s single file else ffmpeg segment muxer; sequential transcribe; join `' '`. **Spec's 1s overlap dropped** — hard boundaries avoid duplicated words at joins (documented deviation). multer memory `.single('audio')` (25MB cap; `MulterError` → 413). `child_process.execFile` (no new dep); paths from `FFMPEG_PATH`/`FFPROBE_PATH`; temp cleanup in `finally`. STT client honors `ADDIS_AI_BASE_URL` for parity with chat.
 - **Composer (X-Chat store-driven):** `forwardRef` wrapper `MuiChatComposer` exposing `focusInput()`/`replaceContent(text)` (→ `setValue` + focus). No react-hook-form in composer. For all RHF forms (preset dialog): `register` always; `Controller` only when `register` is genuinely impractical (documented exceptions); `watch`/`useWatch`/`useFormState` banned.
 - **STRICT — JSDoc everywhere:** every function, method, and class gets a JSDoc block (`/** @param {type} name — meaning · @returns {type} meaning */`). No bare function without a doc block. Modules that export no functions carry a module-header comment.
 - **STRICT — Arrow functions only:** all functions are declared as `const name = (...) => { … }`. Narrow exceptions where an arrow cannot be used: class constructors, generator functions (`function*`), and Mongoose schema methods/hooks/plugins that bind `this`.
@@ -30,8 +30,8 @@
 
 ## Phases
 
-### Phase 1 — Foundations ✅ DONE (pending review/commit)
-**Status:** in_progress
+### Phase 1 — Foundations ✅ DONE
+**Status:** completed
 - [x] Create `phase-1-foundations` branch
 - [x] Write planning files (`task_plan.md`, `findings.md`, `progress.md`) — project root
 - [x] Write `docs/superpowers/specs/2026-08-29-ai-assistant-design.md`
@@ -42,10 +42,10 @@
 - [x] Mongo connect exponential-backoff retry (`config/mongo.js` `connectWithRetry` + `MONGO_RETRY` constants; `server.js` uses it)
 - [x] JSDoc + arrow-function backfill across all Phase 1 files
 - [x] Validate: `node --check` all JS; server boots; Mongo connect; negative test (unreachable MONGO_URI logs escalating retries)
-- [ ] **STOP for user review → commit `feat: phase 1 foundations …` → push → merge → delete branch**
+- [x] STOP → user review → committed `feat: phase 1 foundations …` → merged to main → branch deleted
 
-### Phase 2 — Data & APIs
-**Status:** in_progress (implemented; awaiting review)
+### Phase 2 — Data & APIs ✅ DONE
+**Status:** completed
 - [x] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
 - [x] Conversation CRUD (`GET|POST /api/conversations`, `PATCH|DELETE /:id`)
 - [x] Messages read (paginated `GET /api/conversations/:id/messages`)
@@ -54,17 +54,20 @@
 - [x] Shared pagination (`utils/pagination.js`: validators, payload, resolvePage/Limit); `utils/pickFields.js`
 - [x] Delete cascades: conversation → messages; preset → `$unset` presetId on conversations
 - [x] Validate: `node --check`; boot; smoke (19/19 curl checks) — done
-- [ ] **STOP for user review → commit phase 2 → push → merge → delete branch**
+- [x] STOP → reviewed → committed `feat: phase 2 …` → merged to main → branch deleted
 
 ### Phase 3 — AI providers + STT
-**Status:** pending
-- [ ] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
-- Provider catalog + `getMetaModels` key-gating
-- `addis`, `gemini`, `openaiCompat` (nvidia/groq/openrouter) providers → normalize `{ content, reasoning }`
-- `POST /api/chat` controller (load history → call → persist user+assistant → return assistant message)
-- STT: multer upload, ffprobe/ffmpeg → ≤60s split, sequential Addis transcribe, merge, cleanup
-- Validate: `node --check`; curl `/api/meta/models` (groq/openrouter hidden); real `/api/chat`; STT short + >60s sample
-- STOP for review → commit → push → merge → delete branch
+**Status:** in_progress (implementation + validation done; awaiting review/commit)
+- [x] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
+- [x] Provider catalog (`providerCatalog.js`: frozen defs, key-gated availability, key-independent `getModelInfo`) + `GET /api/meta/models` key-gating (only keyed providers listed)
+- [x] `addis` (SDK), `gemini` (REST `generateContent`), `openAiCompat` factory (nvidia/groq/openrouter) adapters → normalize `{ content, reasoning, model }`; `providerErrors` mapper (429/402 surfaced, 5xx genericized)
+- [x] `POST /api/chat` (conv 404 → catalog model check → adapter/503 key-gate → load history → generate → persist user+assistant → return assistant message)
+- [x] Conversation model validates provider/model against catalog (400 unknown); conversation fields `systemPrompt` (≤4000) + `persona` (≤2000); adapter `generate({messages, model, language, system, persona, reasoningLevel})` unified
+- [x] STT: multer 25MB upload → ffprobe/ffmpeg → mono-16k WAV → ≤60s split/merge → sequential Addis transcribe → cleanup
+- [x] LIVE model corrections: gemini `2.5-flash` retired → `gemini-3.6-flash` + `thinkingLevel`; nvidia `meta/llama-3.3-70b-instruct` EOL (410) → `openai/gpt-oss-120b`
+- [x] Validate: `node --check`; boot; `/api/meta/models` (groq/openrouter hidden); real `/api/chat`; STT 2s + 65s tone + real 187.7s Amharic webm (200 in 33s); cross-model comparison (gemini 4 efforts + gpt-oss-120b + addis)
+- [x] Strict validation: every backend file read top-to-bottom (findings in `progress.md`; fixes PENDING approval: addis STT `baseURL`, dead `OVERLAP_SECONDS`, gemini empty-parts guard)
+- [ ] STOP for review → commit → push → merge → delete branch
 
 ### Phase 4 — Chat UI
 **Status:** pending
@@ -106,13 +109,21 @@
 | 14 | STRICT: JSDoc everywhere (functions/methods/classes; module headers for others) | User instruction |
 | 15 | STRICT: arrow functions only (exceptions: class ctors, generators, moongoose `this`-binding hooks) | User instruction |
 | 16 | STRICT: no unused imports/variables (exception: framework-required params like error-handler `next`) | User instruction |
+| 17 | `system`/`persona` live as conversation fields (`systemPrompt` ≤4000, `persona` ≤2000); adapters forward full native surface; generation = server defaults (no per-request passthrough) | User approval (session) |
+| 18 | STT 1s overlap dropped — hard segment boundaries avoid duplicated words at joins (documented deviation) | Implementation |
+| 19 | Gemini 2.5-flash retired → `gemini-3.6-flash` (`thinkingLevel`); NVIDIA llama-3.3-70b EOL → `openai/gpt-oss-120b` (both probed live) | Live validation |
+| 20 | Adapter `generate` uniform props; openai-compat prepends `{role:"system"}` (persona+system); gemini folds both into `systemInstruction`; addis uses native `system`/`persona` | Implementation |
+| 21 | Strict pre-commit validation: every backend file read top-to-bottom before each phase commit | User instruction |
+| 22 | For Amharic report synthesis prefer `gemini-3.6-flash` or `addis-1-alef`; `openai/gpt-oss-120b` hallucinated on the live test | Live comparison |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|
-| _none yet_ | | |
+| NVIDIA `meta/llama-3.3-70b-instruct` → 410 Gone (EOL 2026-08-26) | kept model | account probe (nemotron/chatqa/mistral 404; llama-3.2 vision + gpt-oss 200) → catalog switched to `openai/gpt-oss-120b` |
+| Gemini `gemini-2.5-flash` rejected (retired for new users) | kept model | switched to `gemini-3.6-flash` + `thinkingConfig.thinkingLevel` |
+| `addisSttService` client ignores `ADDIS_AI_BASE_URL` (chat adapter honors it) | — | one-line fix pending user approval before commit |
 
 ## Next Step
-Wait for user review of Phase 1 output, then commit Phase 1 (`feat: phase 1 foundations`), push, merge, delete branch, and start Phase 2 naming the single next action.
+Apply approved strict-validation fixes (addis STT `baseURL`, remove dead `OVERLAP_SECONDS`, gemini empty-parts guard), re-run `node --check`, then present Phase 3 for review → commit `feat: phase 3 ai providers & stt …` → push → merge → delete `phase-3-ai` → start Phase 4 (Chat UI) with mandatory deep-analysis Step 0.
 
 <｜DSML｜parameter name="lazy" string="false">true
