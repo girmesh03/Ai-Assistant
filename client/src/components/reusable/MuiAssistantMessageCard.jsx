@@ -1,0 +1,189 @@
+import { useEffect, useRef, useState } from 'react';
+import {
+  Box,
+  Collapse,
+  IconButton,
+  Tooltip,
+  Typography,
+  Divider,
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import ReplayIcon from '@mui/icons-material/Replay';
+import { useMessage, useChatActions } from '@mui/x-chat/headless';
+import { toast } from 'react-toastify';
+import { partsToText, formatTime } from '../../utils/format.js';
+
+/**
+ * Renders an assistant reply: optional collapsible "reasoning" disclosure
+ * (Verdant gold) above the prose, and a hover-revealed Copy/Retry action bar.
+ * Retry re-runs generation from this reply's anchor user message.
+ *
+ * @module components/reusable/MuiAssistantMessageCard
+ */
+
+/**
+ * @param {object} props - Card props.
+ * @param {string} props.messageId - Message id from the chat store.
+ * @returns {import('react').JSX.Element} The assistant card.
+ */
+export const MuiAssistantMessageCard = ({ messageId }) => {
+  const message = useMessage(messageId);
+  const actions = useChatActions();
+  const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef(/** @type {ReturnType<typeof setTimeout> | undefined} */ (undefined));
+
+  useEffect(() => {
+    return () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, []);
+
+  if (!message) return null;
+
+  const reasoningText = partsToText(message.parts.filter((part) => part.type === 'reasoning'));
+  const text = partsToText(message.parts.filter((part) => part.type === 'text'));
+  const isStreaming =
+    message.status === 'streaming' ||
+    message.parts.some((part) => part.type === 'text' && part.state === 'streaming');
+
+  /**
+   * Copies the reply text to the clipboard with a transient check icon.
+   *
+   * @returns {void}
+   */
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 1500);
+      toast.info('Copied to clipboard');
+    });
+  };
+
+  /**
+   * Re-generates the reply in place from its anchor user message.
+   *
+   * @returns {void}
+   */
+  const handleRetry = () => {
+    void actions.regenerate(message.id);
+  };
+
+  return (
+    <Box
+      className="selam-msg"
+      sx={{
+        alignSelf: 'flex-start',
+        maxWidth: { xs: '96%', md: '78%' },
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          borderRadius: 2,
+          borderTopLeftRadius: 2,
+          p: 1.5,
+          bgcolor: 'background.paper',
+          border: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main' }}>
+          ሰላም
+        </Typography>
+
+        {reasoningText && (
+          <Box>
+            <Tooltip title={reasoningOpen ? 'Hide thinking' : 'Show thinking'}>
+              <Box
+                component="button"
+                type="button"
+                onClick={() => setReasoningOpen((open) => !open)}
+                aria-expanded={reasoningOpen}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  border: 'none',
+                  bgcolor: 'transparent',
+                  cursor: 'pointer',
+                  p: 0,
+                  color: 'warning.main',
+                  typography: 'caption',
+                  fontWeight: 600,
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                <ExpandMoreIcon
+                  sx={{ fontSize: 16, transform: reasoningOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}
+                />
+                Reasoning
+              </Box>
+            </Tooltip>
+            <Collapse in={reasoningOpen} timeout="auto" unmountOnExit>
+              <Box
+                sx={{
+                  mt: 0.5,
+                  p: 1,
+                  borderRadius: 1,
+                  bgcolor: 'warning.light',
+                  opacity: 0.82,
+                  color: 'warning.contrastText',
+                  typography: 'body2',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                }}
+              >
+                {reasoningText}
+              </Box>
+            </Collapse>
+          </Box>
+        )}
+
+        {reasoningText && <Divider sx={{ my: 0.5 }} />}
+
+        <Typography
+          component="div"
+          variant="body2"
+          sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        >
+          {text}
+          {isStreaming && (
+            <Box
+              component="span"
+              sx={{ color: 'primary.main', '&::after': { content: '"▍"' } }}
+            />
+          )}
+        </Typography>
+      </Box>
+
+      <Box className="selam-msg-actions" sx={{ display: 'flex', gap: 0.25, mt: 0.25, opacity: 0, transition: 'opacity 0.15s ease' }}>
+        <Tooltip title="Copy">
+          <IconButton size="small" aria-label="Copy" onClick={handleCopy}>
+            {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Retry">
+          <IconButton size="small" aria-label="Retry" onClick={handleRetry}>
+            <ReplayIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        {message.createdAt && (
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ alignSelf: 'center', color: 'text.disabled', ml: 0.5, fontSize: '0.65rem' }}
+          >
+            {formatTime(message.createdAt)}
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  );
+};

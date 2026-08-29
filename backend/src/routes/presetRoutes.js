@@ -30,6 +30,11 @@ const createPresetValidators = [
     .isLength({ max: 120 })
     .withMessage('Name must be 120 characters or fewer'),
   body('prompt').trim().notEmpty().withMessage('Prompt is required'),
+  body('persona')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: constants.CHAT.PERSONA_MAX_LENGTH })
+    .withMessage(`Persona must be ${constants.CHAT.PERSONA_MAX_LENGTH} characters or fewer`),
   body('modelProviderId')
     .optional({ values: 'falsy' })
     .trim()
@@ -61,6 +66,11 @@ const updatePresetValidators = [
     .isLength({ max: 120 })
     .withMessage('Name must be 120 characters or fewer'),
   body('prompt').optional().trim().notEmpty().withMessage('Prompt cannot be empty'),
+  body('persona')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: constants.CHAT.PERSONA_MAX_LENGTH })
+    .withMessage(`Persona must be ${constants.CHAT.PERSONA_MAX_LENGTH} characters or fewer`),
   body('modelProviderId')
     .optional({ values: 'falsy' })
     .trim()

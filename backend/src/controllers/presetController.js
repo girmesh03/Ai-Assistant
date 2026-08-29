@@ -11,7 +11,7 @@ import { pickFields } from '../utils/pickFields.js';
  *
  * @type {ReadonlyArray<string>}
  */
-const PRESET_FIELDS = Object.freeze(['name', 'prompt', 'modelProviderId', 'modelId', 'reasoningEffort']);
+const PRESET_FIELDS = Object.freeze(['name', 'prompt', 'persona', 'modelProviderId', 'modelId', 'reasoningEffort']);
 
 /**
  * Lists presets, newest first, paginated.
@@ -37,7 +37,10 @@ export const listPresets = expressAsyncHandler(async (req, res) => {
  * @returns {Promise<void>}
  */
 export const createPreset = expressAsyncHandler(async (req, res) => {
-  const preset = await Preset.create(pickFields(req.body, PRESET_FIELDS));
+  const fields = pickFields(req.body, PRESET_FIELDS);
+  if (fields.persona === '') fields.persona = null;
+
+  const preset = await Preset.create(fields);
 
   res.status(httpStatus.CREATED).json({ success: true, message: 'Preset created', data: preset });
 });
@@ -55,6 +58,8 @@ export const updatePreset = expressAsyncHandler(async (req, res) => {
   if (Object.keys(updates).length === 0) {
     throw new AppError('No valid fields provided', httpStatus.BAD_REQUEST);
   }
+
+  if (updates.persona === '') updates.persona = null;
 
   const preset = await Preset.findByIdAndUpdate(req.params.id, updates, {
     new: true,

@@ -40,8 +40,38 @@ Backend: `config/env.js` (frozen), `controllers/`, `middleware/`, `models/`, `ut
 - Composer: X-Chat store; forwardRef wrapper `MuiChatComposer` → `focusInput()`, `replaceContent(text)` mapping to `setValue` + focus (STT fill).
 - RHF forms (preset dialog): `register` always; `Controller` only when impractical (documented); `watch`/`useWatch`/`useFormState` banned.
 
-## Visual identity (OPEN — user deferred)
-- Provisional token-driven theme only (one-file change). Directions pitched: A "Verdant manuscript" (light green paper `#F2F3EE`, emerald `#1E6B4E` assistant, gold `#C78F1B` thinking, oxblood `#A63A2B` danger; dark #101714) | B "Midnight" | custom. Default mode (system/light/dark) also open.
+## Visual identity (DECIDED — Phase 4)
+- **Verdant manuscript** (Ethiopic-manuscript reading room): light canvas `#EFEEE6`, surface `#FBFAF4`, ink `#233228`, evergreen `#2F6B4E` (user), gold `#C1912F` (rubrication/reasoning), oxblood `#9E3B32` (danger). Dark: canvas `#0F1511`, surface `#161E18`, ink `#E5E7DC`, evergreen `#7CB894`, gold `#D9AE4A`, oxblood `#D06A5E`.
+- Type: Inter (body), **Noto Serif Ethiopic** (display, restraint), **IBM Plex Mono** (utility/timestamps). Scale 13/14/16/20/28–32, chat line-height ~1.55.
+- **Signature:** gold rubrication — slim gold rule on the active conversation, gold reasoning disclosures, gold underline under the empty-state ሰላም. Everything else quiet.
+- Default mode: **system** (`colorSchemes:{dark:true}`, `defaultMode:"system"`, `noSsr`, localStorageManager). User-facing toggle deferred to Phase 5.
+- Token-driven single theme file (`client/src/theme/index.js`) so Phase 5 finalization stays a one-file change.
+
+## Phase 4 strict UI rules (user, 2026-08-29 — MUST respect)
+1. **MUI sizing:** every MUI component gets `size="small"` unless it has no `size` prop; icon glyphs (`SvgIcon`/`@mui/icons-material`) → `fontSize="small"`; components with neither prop are exempt. Mapping: `Button`/`IconButton`/`TextField`/`Select`/`Chip`/`Avatar`/`InputAdornment` → `size="small"`; icon glyphs → `fontSize="small"`; `Tooltip`/`Dialog`/`Card`/layout = exempt (no such prop).
+2. **Assistant responses:** Copy + Retry actions, each with the apposite icon + a `Tooltip` ("Copy" / "Retry").
+3. **User requests:** each previous user message = **collapsible card** with Copy + Edit (icon + tooltip). Edit → inline text input via **react-hook-form (`register` + `forwardRef`)**; while editing, the Edit icon becomes the Update control.
+4. **Reference:** message-action UX modeled on the **Gemini UI** idioms (hover-revealed actions, header-mounted controls), rendered in the Verdant theme.
+5. **Edit/Retry data model (approved):** truncate-at-turn + regenerate in place (see logic below).
+
+## Phase 4 implementation logic (contracts & decisions)
+- **Backend additions (3):**
+  1. `GET /api/conversations/:id/messages` gains `?sort=asc|desc` (default `asc`) → signed sort key in `messageController`, `query('sort').isIn(['asc','desc'])` validator in `messageRoutes`. Backward pagination for X-Chat (newest page first, then reversed for ascending display).
+  2. Preset gains optional `persona` (≤2000): `Preset.js` schema + `PRESET_FIELDS` + create/update validators — enables one-click "instructions + tone".
+  3. **`POST /api/chat/regenerate`** `{conversationId, userMessageId, content?, reasoningEffort?}` — the single mechanism behind both Retry and Edit:
+     - Validations mirror `POST /api/chat` plus `userMessageId` must be a MongoId belonging to the conversation with `role:'user'`; `content` (when given) trimmed, ≤ `MAX_MESSAGE_LENGTH`.
+     - When `content` given: update that user message's text.
+     - **Truncate:** delete that turn's assistant reply and every message at a later chronological position.
+     - Rebuild history **up to (excluding)** the user message via new `loadHistoryMessagesUpTo(conversationId, beforeMessageId)`; append the (edited) user message; call provider with conversation `systemPrompt`/`persona`/`language`/`modelId` and `reasoningLevel = body ?? conversation.reasoningEffort`.
+     - Persist the fresh assistant message; return `{conversationId, userMessage, assistantMessage}`.
+     - Client: **Retry** (assistant) → regenerate without `content`; **Edit** (user) → regenerate with `content`.
+- **Unified Edit/Retry model (user-approved):** any edit/retry truncates the thread at that turn and regenerates one fresh reply in place. No message-PATCH/append-dup endpoints; conversations keep `hi → reply → edited-question → NEW reply`.
+- **Abort semantics (accepted):** aborting a chat POST doesn't cancel server work — the assistant reply still persists (Node continues); client shows `cancelled`. Phase 5 candidate: cancel endpoint.
+- **X-Chat integration:** composable route (`ChatLayout` + `ChatConversationList` + `ChatConversation`), **not** `ChatBox`. `useChatComposer()` store. `MuiChatComposer` composes `ChatComposerTextArea` with its own ref → `focusInput()`/`replaceContent()` (STT fill). Model selector = MUI `Select` in `slots.conversationHeaderActions`; `ownerState.hasConversation` gates; adapter rebuilt via `React.useMemo`. Reasoning = `ChatReasoningMessagePart`; restyle `slotProps.messageContent.partProps.reasoning.slots.{root,summary,content}`; locale labels `messageReasoningStreamingLabel` (እያሰብኩ ነው…) / `messageReasoningLabel`. Theme via `createTheme` + `import type {} from '@mui/x-chat/themeAugmentation'`; bubbles read `palette.primary.main`/`grey[100]|grey[800]`/`body2`/`shape.borderRadius`/`divider`; dark = `colorSchemes:{dark:true}` + `defaultMode:"system"` + `noSsr` (SPA).
+- **Adapter protocol (client):** `baseUrl "/api"` via Vite proxy → `:4000`. `sendMessage({conversationId,message,messages,signal})` → `fetch POST /api/chat` → synthesize `ReadableStream`: `start` → `reasoning-{start,delta,end}` (only when reply has reasoning) → `text-start/delta/end` → `finish`; failures → `error` chunk mapped to X-Chat error codes. `listMessages` → `GET ?sort=desc&page`, newest page first, reverse for ascending display; cursor = next older page; `hasMore = page < totalPages` (scroll-to-top prepend). `listConversations` → newest-first paging. RTK `baseApi` = `fetchBaseQuery('/api')` + envelope unwrap (return payload `data`, keep `message` for toasts). Mongo `_id` → X-Chat `id` mapping in the adapter. `?c=` query param syncs the active conversation (deep-link).
+- **Presets (apply-to-conversation):** `prompt`→`systemPrompt`; optional `persona`/`modelProviderId`/`modelId`/`reasoningEffort` copied only when set; `presetId` recorded. New chat → `POST /api/conversations` with derived body (title = client default "New chat N" since `title` is required); existing chat → `PATCH /api/conversations/:id` (never touches `title`). **Remove preset** → `PATCH {systemPrompt:"", persona:"", presetId:null}` (server normalizes `""→null`). Preset deleted (server) → unsets `presetId` on conversations, copied text kept.
+- **STT wiring:** `useVoiceRecorder` (MediaRecorder webm/opus; ~300s auto-stop; `navigator.mediaDevices` permission errors → toast with remedy) → `POST /api/speech/transcribe` → `replaceContent(text)` + focus + toast "Transcribed"; mic disabled without an active conversation.
+- **Conversation/message actions:** New chat (auto-title), inline rename, delete-with-confirm, active persisted to `?c=`; assistant = Copy/Retry; user card = Copy/Edit (collapsible). Message delete = out of scope (Phase 5).
 
 ## Other
 - Client npm dep list (user-pinned) — see task_plan.md Tech Stack. `@mui/icons-material@^9.3.1`.

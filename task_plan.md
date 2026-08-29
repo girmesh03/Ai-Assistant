@@ -19,12 +19,13 @@
 - **Providers (as implemented):** addis (`addis-1-alef`, SDK, no reasoning), gemini (`gemini-3.6-flash`, REST `generateContent`, reasoning via `thinkingConfig.thinkingLevel` off→minimal/low→low/medium→medium/high→high; **`gemini-2.5-flash` retired for new users**), nvidia (`openai/gpt-oss-120b`; **`meta/llama-3.3-70b-instruct` EOL since 2026-08-26 → 410 Gone**), groq (`qwen/qwen3-32b`, `reasoning_format:"parsed"` + `reasoning_effort`; off→`hidden`+`none`), openrouter (`deepseek/deepseek-r1:free`). One shared `openaiCompat` adapter factory (axios) for nvidia/groq/openrouter with injectable `buildReasoningParams`. Reasoning levels: Off/Low/Medium/High (per-conversation default + per-message override). Every adapter receives the conversation's `systemPrompt`/`persona`; generation params = server defaults (`GENERATION`: temperature 0.7; addis/compat max_tokens 4096; gemini 8192).
 - **STT:** Addis AI only; ffprobe duration gate (reject <1s and >300s → 400); normalize to mono 16k WAV; ≤60s single file else ffmpeg segment muxer; sequential transcribe; join `' '`. **Spec's 1s overlap dropped** — hard boundaries avoid duplicated words at joins (documented deviation). multer memory `.single('audio')` (25MB cap; `MulterError` → 413). `child_process.execFile` (no new dep); paths from `FFMPEG_PATH`/`FFPROBE_PATH`; temp cleanup in `finally`. STT client honors `ADDIS_AI_BASE_URL` for parity with chat.
 - **Composer (X-Chat store-driven):** `forwardRef` wrapper `MuiChatComposer` exposing `focusInput()`/`replaceContent(text)` (→ `setValue` + focus). No react-hook-form in composer. For all RHF forms (preset dialog): `register` always; `Controller` only when `register` is genuinely impractical (documented exceptions); `watch`/`useWatch`/`useFormState` banned.
+- **STRICT — MUI sizing & message actions:** every MUI component gets `size="small"` unless it has no such prop (icons → `fontSize="small"`; no-prop components exempt). Each assistant response: Copy + Retry (icon + tooltip). Each user request: collapsible card with Copy + Edit; Edit opens an inline react-hook-form input (`register`, `forwardRef`) and the Edit icon becomes Update while editing. Message-action UX follows the Gemini UI's idioms, in the Verdant manuscript theme. (Full wording in `findings.md`.)
 - **STRICT — JSDoc everywhere:** every function, method, and class gets a JSDoc block (`/** @param {type} name — meaning · @returns {type} meaning */`). No bare function without a doc block. Modules that export no functions carry a module-header comment.
 - **STRICT — Arrow functions only:** all functions are declared as `const name = (...) => { … }`. Narrow exceptions where an arrow cannot be used: class constructors, generator functions (`function*`), and Mongoose schema methods/hooks/plugins that bind `this`.
 - **STRICT — No unused imports/variables:** every import and every declared variable must be used; remove dead bindings. Exception: parameters a framework requires by signature (Express error-handler `next`).
 - **Conventions:** no deprecated MUI props (v9 slot form + `slotProps={{ paper:… }}`); no magic values (`utils/constants.js` frozen UPPER_SNAKE + `config/env.js` frozen); no `console.log` backend (Winston only); arrow functions (mongoose hooks/methods/constructors excepted); kebab-case JS modules, PascalCase one-export React components, `Mui*` prefix in `client/src/components/reusable/`, no barrel files; JSDoc on functions; `express-async-handler`; provider routes kebab-case; envelope `{ success, message, data }`; pagination `{ docs, page, limit, totalDocs, totalPages }` via mongoose-paginate-v2; plain end-user error messages; keys only in `backend/.env` + `.env.example` committed.
 - **Protocol:** per-phase branch (`phase-N-description`), never commit to main. **Every phase starts with DEEP ANALYSIS: read the entire codebase without skipping a single thing, build a super deep understanding of each file's responsibility and module relationships, verify consistency against the spec/plan, and log any drift/surprises in `progress.md` BEFORE writing code.** Then execute uncommitted → user review → explicit approval → `feat: phase N …` commit → push → merge → delete branch. `chore:` for hardening. No amend after push. Validation: `node --check` on backend JS; `vite build` 0 errors + `dist/` deleted; curl smoke; manual E2E record→transcribe→submit.
-- **Open items (user to decide later):** visual identity direction + default theme mode. Theme = token-driven single file so it's a one-file change.
+- **Decided (Phase 4):** visual identity = **Verdant manuscript**; default mode = **system** (`colorSchemes` + `noSsr`). **Open items:** user-facing theme-mode toggle (Phase 5). Theme = token-driven single file (`client/src/theme/index.js`).
 
 ---
 
@@ -70,13 +71,16 @@
 - [x] STOP → reviewed → committed `feat: phase 3 ai providers & stt …` (`a017ecd`) → merged to main (`ade9cfa`) → pushed → branch deleted
 
 ### Phase 4 — Chat UI
-**Status:** pending
-- [ ] **Deep analysis first:** read the entire codebase without skipping; super deep understanding; log in `progress.md`
+**Status:** in progress (branch `phase-4-chat-ui`)
+- [x] **Deep analysis first** — done; strict UI rules + full logic recorded (see `progress.md`/`findings.md`)
+- [ ] **Backend additions (3):** `?sort=asc|desc` on messages; optional `persona` on presets; `POST /api/chat/regenerate` (truncate-below + regenerate in place) → re-validate backend
 - Scaffold `client/` (Vite react template → install)
-- Theme token file (provisional; identity open) + redux store + RTK features
+- Theme token file (Verdant manuscript, system mode) + redux store + RTK features + router + toasts + error-boundary
 - X-Chat composition (layout, list, thread, header actions, message slots, empty overlay)
-- `MuiChatComposer` forwardRef wrapper; chat adapter (ReadableStream from REST)
-- `useVoiceRecorder` + STT wiring; presets dialog (RHF `register`)
+- `MuiChatComposer` forwardRef wrapper (`focusInput`/`replaceContent`); chat adapter (ReadableStream from REST) + regenerate + `listMessages`/`listConversations`
+- `useVoiceRecorder` + STT wiring; headers: model/reasoning selectors + language pill
+- Presets: dialog (RHF `register`, incl. `persona`) + apply-to-conversation orchestration + chip
+- Message actions: assistant Copy + Retry (tooltip); `MuiUserMessageCard` collapsible card with Copy + Edit (RHF inline edit, Edit→Update); Gemini idioms
 - Validate: `vite build` 0 errors + `dist/` deleted; manual E2E
 - STOP for review → commit → push → merge → delete branch
 
@@ -115,6 +119,12 @@
 | 20 | Adapter `generate` uniform props; openai-compat prepends `{role:"system"}` (persona+system); gemini folds both into `systemInstruction`; addis uses native `system`/`persona` | Implementation |
 | 21 | Strict pre-commit validation: every backend file read top-to-bottom before each phase commit | User instruction |
 | 22 | For Amharic report synthesis prefer `gemini-3.6-flash` or `addis-1-alef`; `openai/gpt-oss-120b` hallucinated on the live test | Live comparison |
+| 23 | Visual identity = **Verdant manuscript**; default mode = **system** (`colorSchemes:{dark:true}`, `defaultMode:"system"`, `noSsr`); toggle deferred to Phase 5 | User approval (Phase 4) |
+| 24 | Presets = **apply-to-conversation** orchestration (`prompt`→`systemPrompt`; optional provider/model/reasoning/persona copied only when set; `presetId` recorded). "Remove preset" = PATCH `{systemPrompt:"", persona:"", presetId:null}` | User approval (Phase 4) |
+| 25 | Preset gains optional `persona` (≤2000) — model + `PRESET_FIELDS` + create/update validators | User approval (Phase 4) |
+| 26 | Message history: `GET /api/conversations/:id/messages` gains optional `?sort=asc|desc` (default `asc`) for X-Chat backward pagination | Implementation (Phase 4) |
+| 27 | STRICT UI rules (size="small"; assistant Copy/Retry; user collapsible card + inline RHF edit; Gemini idioms) — full wording in `findings.md` | User instruction (Phase 4) |
+| 28 | Edit/Retry = **truncate-at-turn + regenerate in place** via new `POST /api/chat/regenerate` | User approval (Phase 4) |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -124,6 +134,6 @@
 | `addisSttService` client ignores `ADDIS_AI_BASE_URL` (chat adapter honors it) | passed baseURL to STT client | fixed in `a017ecd` |
 
 ## Next Step
-Phase 3 shipped (commit `a017ecd`, merge `ade9cfa`). Start **Phase 4 — Chat UI**: create `phase-4-chat-ui` branch from `main`, run the mandatory deep-analysis Step 0 (read the entire codebase + spec/plan, log findings in `progress.md`), then scaffold `client/`.
+Phase 4 — Chat UI **in progress** on `phase-4-chat-ui`. Step 0 deep analysis done (`progress.md`); strict UI rules + implementation logic recorded (`findings.md`); decisions #23–#28. Next: the 3 backend additions (messages `sort`, preset `persona`, `POST /api/chat/regenerate`), then `client/` scaffold.
 
 <｜DSML｜parameter name="lazy" string="false">true
