@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Box,
-  Collapse,
-  IconButton,
-  Tooltip,
-  Typography,
-  Divider,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Collapse from '@mui/material/Collapse';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
@@ -21,7 +19,7 @@ import { partsToText, formatTime } from '../../utils/format.js';
  * (Verdant gold) above the prose, and a hover-revealed Copy/Retry action bar.
  * Retry re-runs generation from this reply's anchor user message.
  *
- * @module components/reusable/MuiAssistantMessageCard
+ * @module components/chat/MuiAssistantMessageCard
  */
 
 /**

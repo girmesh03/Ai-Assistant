@@ -1,4 +1,8 @@
-import { Box, Paper, Divider, Typography, Chip } from "@mui/material";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Divider from "@mui/material/Divider";
+import Typography from "@mui/material/Typography";
+import Chip from "@mui/material/Chip";
 import { BRAND_NAME, SUGGESTED_PROMPTS } from "../../utils/constants.js";
 
 /**
@@ -6,7 +10,7 @@ import { BRAND_NAME, SUGGESTED_PROMPTS } from "../../utils/constants.js";
  * brand mark and a set of suggested opening prompts that create a
  * conversation and send the prompt immediately.
  *
- * @module components/reusable/MuiEmptyState
+ * @module components/chat/MuiEmptyState
  */
 
 /**

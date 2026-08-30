@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, IconButton, TextField, Tooltip, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
@@ -17,7 +21,7 @@ import { chatAdapter } from '../../adapters/chatAdapter.js';
  * react-hook-form so the user can rewrite the request before it is resent
  * (truncate-at-turn + regenerate in place).
  *
- * @module components/reusable/MuiUserMessageCard
+ * @module components/chat/MuiUserMessageCard
  */
 
 /**

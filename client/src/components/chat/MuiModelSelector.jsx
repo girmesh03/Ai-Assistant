@@ -1,15 +1,13 @@
 import { useState } from "react";
-import {
-  Box,
-  FormControl,
-  IconButton,
-  ListSubheader,
-  Menu,
-  MenuItem,
-  Select,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import Box from "@mui/material/Box";
+import FormControl from "@mui/material/FormControl";
+import IconButton from "@mui/material/IconButton";
+import ListSubheader from "@mui/material/ListSubheader";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import { useSelector } from "react-redux";
 import {
@@ -25,7 +23,7 @@ import { MODEL_LOADING_LABEL } from "../../utils/constants.js";
  * a provider-grouped menu (xs appbar). Groups the catalog by provider and
  * persists changes through the page's update handler.
  *
- * @module components/reusable/MuiModelSelector
+ * @module components/chat/MuiModelSelector
  */
 
 /** Encodes a provider/model pair as a Select option value. */

@@ -34,7 +34,7 @@
 - **Addis AI:** base URL `https://api.addisassistant.com`; chat uses `X-API-Key`; SDK `addisai`: `new AddisAI({apiKey})`, `chat.completions.create(...)`, `speech.transcribe({audio, language})` (am/om/en). STT max 60s per segment.
 
 ## Sibling conventions (source: Report-Builder-V4, from agreed notes)
-Backend: `config/env.js` (frozen), `controllers/`, `middleware/`, `models/`, `utils/`. Client: `components/{auth,layout,pages,reusable}/`, `redux/features/*Slice.js`. Response envelope `{ success, message, data }`; pagination `{ docs, page, limit, totalDocs, totalPages }` via mongoose-paginate-v2.
+Backend: `config/env.js` (frozen), `controllers/`, `middleware/`, `models/`, `utils/`. Client: `pages/` + `components/{auth,layout,chat}/` (chat components moved from `reusable/` on 2026-08-30, `reusable/` kept empty), `redux/features/*Slice.js`. Response envelope `{ success, message, data }`; pagination `{ docs, page, limit, totalDocs, totalPages }` via mongoose-paginate-v2.
 
 ## Composer / form decisions
 - Composer: X-Chat store; forwardRef wrapper `MuiChatComposer` → `focusInput()`, `replaceContent(text)` mapping to `setValue` + focus (STT fill).
@@ -53,6 +53,7 @@ Backend: `config/env.js` (frozen), `controllers/`, `middleware/`, `models/`, `ut
 3. **User requests:** each previous user message = **collapsible card** with Copy + Edit (icon + tooltip). Edit → inline text input via **react-hook-form (`register` + `forwardRef`)**; while editing, the Edit icon becomes the Update control.
 4. **Reference:** message-action UX modeled on the **Gemini UI** idioms (hover-revealed actions, header-mounted controls), rendered in the Verdant theme.
 5. **Edit/Retry data model (approved):** truncate-at-turn + regenerate in place (see logic below).
+6. **MUI direct imports (STRICT, user 2026-08-30):** in `client/*`, import MUI one symbol per line from its dedicated subpath — `import Box from '@mui/material/Box'`, `import CssBaseline from '@mui/material/CssBaseline'`. Never import from the root `@mui/material` barrel. The `styles` feature has **no** per-symbol entry points (verified against the v9 exports map — only `./styles` exists, so `@mui/material/styles/ThemeProvider` and `@mui/material/styles/useTheme` **fail to resolve**), so those import by name from the `@mui/material/styles` subpath: `import { ThemeProvider } from '@mui/material/styles'`, `import { createTheme } from '@mui/material/styles'`, `import { useTheme } from '@mui/material/styles'`. `@mui/icons-material/*` are already per-symbol imports; `@mui/x-chat/*` (`headless`, `ChatIndicators`) likewise have no per-symbol entry points → subpath imports as-is. (Folder reorg on the same date: `pages/ChatPage.jsx` → `src/pages/ChatPage.jsx`; `components/reusable/*` → `components/chat/*`, `reusable/` left empty.)
 
 ## Phase 4 implementation logic (contracts & decisions)
 - **Backend additions (3):**

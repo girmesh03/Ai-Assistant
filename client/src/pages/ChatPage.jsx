@@ -1,16 +1,14 @@
 import { useCallback, useRef, useState } from "react";
-import {
-  AppBar,
-  Box,
-  Chip,
-  Drawer,
-  IconButton,
-  Toolbar,
-  Tooltip,
-  Typography,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
+import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
+import Drawer from "@mui/material/Drawer";
+import IconButton from "@mui/material/IconButton";
+import Toolbar from "@mui/material/Toolbar";
+import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
@@ -18,32 +16,32 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { ChatProvider, useChat } from "@mui/x-chat/headless";
-import { chatAdapter } from "../../adapters/chatAdapter.js";
-import { useChatReload } from "../../hooks/useChatReload.js";
-import { useConversationActions } from "../../hooks/useConversationActions.js";
+import { chatAdapter } from "../adapters/chatAdapter.js";
+import { useChatReload } from "../hooks/useChatReload.js";
+import { useConversationActions } from "../hooks/useConversationActions.js";
 import {
   transcribeAudio,
   selectSpeechStatus,
-} from "../../redux/features/speechSlice.js";
+} from "../redux/features/speechSlice.js";
 import {
   openPresetDialog,
   useListPresetsQuery,
-} from "../../redux/features/presetsSlice.js";
+} from "../redux/features/presetsSlice.js";
 import {
   selectDefaultModelPair,
   selectModelInfo,
-} from "../../redux/features/metaSlice.js";
-import { selectSettings, updateSettings } from "../../redux/features/settingsSlice.js";
-import { BRAND_NAME, languagesForModel } from "../../utils/constants.js";
-import { formatTime, truncate } from "../../utils/format.js";
-import { MuiChatConversationList } from "../reusable/MuiChatConversationList.jsx";
-import { MuiChatComposer } from "../reusable/MuiChatComposer.jsx";
-import { MuiChatSurface } from "../reusable/MuiChatSurface.jsx";
-import { MuiEmptyState } from "../reusable/MuiEmptyState.jsx";
-import { MuiLanguageSelector } from "../reusable/MuiLanguageSelector.jsx";
-import { MuiModelSelector } from "../reusable/MuiModelSelector.jsx";
-import { MuiPresetDialog } from "../reusable/MuiPresetDialog.jsx";
-import { MuiReasoningSelector } from "../reusable/MuiReasoningSelector.jsx";
+} from "../redux/features/metaSlice.js";
+import { selectSettings, updateSettings } from "../redux/features/settingsSlice.js";
+import { BRAND_NAME, languagesForModel } from "../utils/constants.js";
+import { formatTime, truncate } from "../utils/format.js";
+import { MuiChatConversationList } from "../components/chat/MuiChatConversationList.jsx";
+import { MuiChatComposer } from "../components/chat/MuiChatComposer.jsx";
+import { MuiChatSurface } from "../components/chat/MuiChatSurface.jsx";
+import { MuiEmptyState } from "../components/chat/MuiEmptyState.jsx";
+import { MuiLanguageSelector } from "../components/chat/MuiLanguageSelector.jsx";
+import { MuiModelSelector } from "../components/chat/MuiModelSelector.jsx";
+import { MuiPresetDialog } from "../components/chat/MuiPresetDialog.jsx";
+import { MuiReasoningSelector } from "../components/chat/MuiReasoningSelector.jsx";
 
 /**
  * The ሰላም chat page: runtime-wrapped workspace that composes the sidebar,
@@ -55,7 +53,7 @@ import { MuiReasoningSelector } from "../reusable/MuiReasoningSelector.jsx";
  * reflect the pre-chat `settings` slice; once a conversation exists they
  * reflect that conversation's metadata and every change writes through to it.
  *
- * @module components/pages/ChatPage
+ * @module pages/ChatPage
  */
 
 /**
@@ -85,7 +83,7 @@ const ChatPageInner = () => {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const composerRef = useRef(
-    /** @type {import('../reusable/MuiChatComposer.jsx').MuiChatComposerHandle | null} */ (
+    /** @type {import('../components/chat/MuiChatComposer.jsx').MuiChatComposerHandle | null} */ (
       null
     ),
   );

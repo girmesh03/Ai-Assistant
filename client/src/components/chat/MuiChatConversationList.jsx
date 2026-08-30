@@ -1,4 +1,11 @@
-import { Box, IconButton, List, ListItemButton, ListItemText, Tooltip, Typography, Divider } from '@mui/material';
+import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import Divider from '@mui/material/Divider';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -16,7 +23,7 @@ import { BRAND_NAME } from '../../utils/constants.js';
  * The conversation sidebar: brand mark, "New chat", the conversation list with
  * per-row delete (gold rule marks the active one), and the presets entry point.
  *
- * @module components/reusable/MuiChatConversationList
+ * @module components/chat/MuiChatConversationList
  */
 
 /**

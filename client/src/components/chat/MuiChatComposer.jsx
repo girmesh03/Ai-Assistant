@@ -1,5 +1,8 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import { Box, IconButton, TextField, Tooltip } from "@mui/material";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import SendIcon from "@mui/icons-material/Send";
 import MicIcon from "@mui/icons-material/Mic";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
@@ -14,7 +17,7 @@ import { useVoiceRecorder } from "../../hooks/useVoiceRecorder.js";
  * A ref handle exposes `{ focusInput, replaceContent, clear }`, used by the
  * welcome screen's suggestion chips to fill and focus the box.
  *
- * @module components/reusable/MuiChatComposer
+ * @module components/chat/MuiChatComposer
  */
 
 /**

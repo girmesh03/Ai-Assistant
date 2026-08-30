@@ -36,6 +36,13 @@ do NOT merge**, then fix case by case.
 
 ## Cases
 
+### Case 004 — folder reorg (`pages/`, `components/chat/`) + MUI direct imports (2026-08-30)
+- **Reported:** (1) move `client/src/components/pages/ChatPage.jsx` → `client/src/pages/ChatPage.jsx`; (2) move `client/src/components/reusable/*` → `client/src/components/chat/*`, leaving `components/reusable/` empty on disk (no `.gitkeep` — an empty dir is untracked by git); (3) correct all resulting imports; **STRICT — every MUI import in `client/*` must be a direct import** (`import Box from "@mui/material/Box"`), recorded as a strict rule in the planning files.
+- **Root cause:** `pages/` held exactly one file and `reusable/` was never reused elsewhere (only `ChatPage` consumed those 10 components) — the layout implied a non-existent reuse boundary. Root-`@mui/material` barrel imports shipped by the docs examples.
+- **Fix (files):** `git mv` (11 renames, history preserved) → `src/pages/ChatPage.jsx` + `src/components/chat/{MuiAssistantMessageCard,MuiChatComposer,MuiChatConversationList,MuiChatSurface,MuiEmptyState,MuiLanguageSelector,MuiModelSelector,MuiPresetDialog,MuiReasoningSelector,MuiUserMessageCard}.jsx`; removed empty `components/pages/`; `components/reusable/` left empty. Imports: `main.jsx` → `./pages/ChatPage.jsx`; `ChatPage.jsx` `../../*`→`../*`, `../reusable/*`→`../components/chat/*` (incl. JSDoc `@type {import('../components/chat/MuiChatComposer.jsx').MuiChatComposerHandle}`); `@module` headers updated in all 11 files. **MUI sweep (13 files):** components/hooks imported from their own subpaths (`@mui/material/Box`, …, `@mui/material/useMediaQuery`); `ThemeProvider`/`useTheme`/`createTheme` import from the `@mui/material/styles` subpath by name (v9 exports map has NO `styles/ThemeProvider`/`styles/useTheme` subpaths — only `./styles`); icons already per-symbol; `@mui/x-chat/{headless,ChatIndicators}` unchanged.
+- **Verification:** `npm run lint` 0; `npm run build` ✓ (chunk-size warning pre-existing); `dist/` removed; grep-assert 0 `reusable/`|`components/pages`|`from '@mui/material'` left in `client/src`. Rule recorded in `findings.md` (#6), `progress.md` (entry), `task_plan.md` conventions.
+- **Review:** <pending user browser test>
+
 ### Case 003 — conversation layout: user right / assistant left + MUI X Chat streaming indicator (2026-08-30)
 - **Reported:** (1) the user's request should render on the **right** side and the assistant's
   response on the **left**; (2) from the moment the user sends until the response is received,

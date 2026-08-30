@@ -1,14 +1,12 @@
 import { useState } from "react";
-import {
-  Box,
-  FormControl,
-  IconButton,
-  Menu,
-  MenuItem,
-  Select,
-  Typography,
-  Tooltip,
-} from "@mui/material";
+import Box from "@mui/material/Box";
+import FormControl from "@mui/material/FormControl";
+import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
+import Typography from "@mui/material/Typography";
+import Tooltip from "@mui/material/Tooltip";
 import PsychologyIcon from "@mui/icons-material/Psychology";
 import { REASONING_LEVELS, REASONING_LABELS } from "../../utils/constants.js";
 
@@ -18,7 +16,7 @@ import { REASONING_LEVELS, REASONING_LABELS } from "../../utils/constants.js";
  * opens a level menu (xs appbar). Persists via the provided change handler.
  * Only rendered for models whose catalog entry has `reasoning: true`.
  *
- * @module components/reusable/MuiReasoningSelector
+ * @module components/chat/MuiReasoningSelector
  */
 
 /**

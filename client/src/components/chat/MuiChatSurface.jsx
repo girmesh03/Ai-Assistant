@@ -1,4 +1,9 @@
-import { Box, Alert, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import { useChat, useMessage, useMessageIds, useStreamingIndicatorVisibility, MessageList } from '@mui/x-chat/headless';
 import { ChatStreamingIndicator, ChatScrollToBottomAffordance } from '@mui/x-chat/ChatIndicators';
@@ -10,7 +15,7 @@ import { MuiUserMessageCard } from './MuiUserMessageCard.jsx';
  * pagination handled by `MessageList.Root`), topped by a dismissible error
  * banner and a history-loading spinner while older messages are fetched.
  *
- * @module components/reusable/MuiChatSurface
+ * @module components/chat/MuiChatSurface
  */
 
 /**

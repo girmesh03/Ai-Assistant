@@ -316,3 +316,10 @@ Deep analysis complete → implementing Phase 2.
 - **Verification:** lint 0, build ✓, `dist/` removed. User re-tests: disabled-until-changed
   Update, no gap after Update, mouse-wheel scroll on the expanded edit textarea. Nothing
   committed (commit on request only).
+
+## 2026-08-30 — Case 004: folder reorg + MUI direct imports (applied)
+
+- **Reported:** move `client/src/components/pages/ChatPage.jsx` → `client/src/pages/ChatPage.jsx`; move `client/src/components/reusable/*` → `client/src/components/chat/*` (keep `reusable/` empty); correct all imports; **STRICT rule — every MUI import in `client/*` must be direct** (`import Box from "@mui/material/Box"`) and must be recorded in the planning files.
+- **Applied:** `git mv` (11 renames) → `pages/ChatPage.jsx` + `components/chat/*` (10 files); removed empty `components/pages/`; left `components/reusable/` empty (no `.gitkeep`). Fixed `main.jsx` + all ChatPage relative/JSDoc imports + `@module` headers (11 files). MUI direct-import sweep across 13 files.
+- **Key finding:** `@mui/material` v9 exports map has NO `./styles/ThemeProvider` or `./styles/useTheme` subpaths — only `./styles`; so `ThemeProvider`/`useTheme`/`createTheme` import by name from `@mui/material/styles` (same shape as `@mui/x-chat/headless`: a feature subpath, not the root barrel). Everything else is per-symbol (`@mui/material/Box`, `@mui/material/useMediaQuery`, `@mui/material/CssBaseline`, `@mui/material/InitColorSchemeScript`, …).
+- **Verified:** lint 0, build ✓ (pre-existing chunk-size warning), `dist/` removed, grep-assert clean (no `reusable/`, `components/pages`, or root `@mui/material` barrel in `client/src`). Rule recorded in `findings.md` #6 + `task_plan.md` conventions. Review pending; nothing committed (commit on request only).
