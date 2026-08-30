@@ -156,3 +156,163 @@ Deep analysis complete → implementing Phase 2.
 - **Working agreement recorded** in the new planning file `cases.md` (Step 1–4 loop + 5 strict requirements: no overriding the existing plan; commit only on request; everything on `phase-4-chat-ui`; everything traceable in planning files; next phase only when Phase 4 is green).
 - Committed the full current state (backend chat/regenerate/presets/messages additions, entire `client/`, planning docs) as `feat: phase 4 chat ui — …` and pushed `origin/phase-4-chat-ui` (no merge to `main`).
 - Phase 4 remains **not green** pending the case loop; `task_plan.md` untouched.
+
+## 2026-08-30 — Case 001: chat settings on landing (implemented)
+
+- User reported 4 chat-page issues → recorded as Case 001 in `cases.md` (root cause, fix, decisions in `findings.md`).
+- **Prefs slice:** new `client/src/redux/features/settingsSlice.js` (`{modelProviderId, modelId, reasoningEffort, language}`, nulls → resolve at creation), registered in `store.js`. Controls read active-conversation `metadata` when active else prefs, and write-through both (prefs + PATCH).
+- **Per-model languages** (`client/src/utils/constants.js`): `MODEL_LANGUAGES` — addis-1-alef `en/am/om`; all other models `en/am` (`languagesForModel` helper + `LANGUAGE_LABELS` moved here).
+- **New `MuiLanguageSelector.jsx`** (Select + compact icon-menu variants) replaces deleted `MuiLanguagePill.jsx` (which was read-only — the "language does nothing" root cause). `MuiReasoningSelector`/`MuiModelSelector` gained `compact` (icon+menu for xs) and `slim` (fit sm appbar) variants; model menu grouped by provider via shared option builder.
+- **`useConversationActions`:** `createChat`/`applyPreset` now seed `reasoningEffort` + `language` from prefs (preset pins win for its fields) and resolve the model via new `resolveModelPair(preset, settings, defaults)`.
+- **`ChatPage.jsx`:** settings row now renders **always** (desktop header row; mobile AppBar). Mobile: Menu + brand, right-aligned controls (icons on xs, slim selects on sm) + preset; **Add icon only when `conversations.length > 0`**; title/time dropped on mobile; delete stays in drawer rows. Reasoning control shown only when the selected model has `reasoning:true`; model switch resets unsupported language to `en`; STT uses prefs language before any conversation.
+- **Verification:** `npm run lint` 0, `npm run build` ✓ 31.5s (dist removed). API-level e2e vs live backend: create addis/am/off ✓, PATCH language ✓, invalid `fr` → 400 ✓, gemini/am/high ✓, preset-apply seeds am/medium + presetId ✓, model-switch om→gemini resets language to en ✓. Cleanup wiped. Browser eyeball still pending (case 1 of 4 — the in-browser confirmation for reload/STT remains open too).
+- Awaiting user review of Case 001 (Step 4); nothing committed (commit on request only).
+
+## 2026-08-30 — Case 001 review R2: four browser items (fixes applied)
+
+- User browser eyeball of R1 surfaced four items (recorded as Case 001 R2 in `cases.md`):
+  desktop controls left-aligned with no active conversation; `om` unavailable for the default
+  Addis model at landing; tooltip arrow at bottom; console warning about `:focus-visible`.
+- Fixes in `ChatPage.jsx`: (1) `desktopControls` wrapped in a right-pushed flex box
+  (`sx={{ ml:'auto', display:'flex', alignItems:'center', gap:1.25 }}`); (2) language options
+  derived from the **resolved** model (`languagesForModel(modelInfo?.id ?? displayModelId)`)
+  so `om` appears for the default addis-1-alef despite `settings.modelId` being null on
+  landing; (3) `placement="top"` on the five chat-page Tooltips (Remove preset, Apply a
+  preset ×2, Delete conversation, New chat).
+- Item 4 root-caused to `@mui/utils/isFocusVisible.mjs` dev-only warn fired when the runtime
+  Chromium rejects the `:focus-visible` selector (`element.matches(':focus-visible')` throws)
+  — environment issue, no code fix; theme's v9.4 `focusVisible` CSS indicator is not enabled
+  and thus not the trigger; production builds never log it.
+- Verification: `npm run lint` 0, `npm run build` ✓. Browser R3 eyeball pending; nothing
+  committed (commit on request only).
+
+## 2026-08-30 — Case 002: preset dialog selects (fixed)
+
+- Reported: in the preset dialog, choosing provider/model/reasoning never shows the picked
+  value on the field, the model list doesn't narrow by provider, and reasoning always lists
+  all levels regardless of model capability. Recorded as Case 002 in `cases.md`.
+- Root cause: the three MUI text selects were bound with RHF `register` +
+  `value={getValues('...')}` and the model filter read `getValues('modelProviderId')`.
+  Verified in the installed `react-hook-form@7.86.0` that `getValues` is non-reactive (no
+  store subscription, no re-render on value change), so displays and the provider-conditioned
+  model list froze; reasoning had no model-capability gate.
+- Fix (all in `MuiPresetDialog.jsx`): the three selects now use RHF **`Controller`**
+  (documented strict-UI-rule #3 exception in `findings.md`); local `providerId` + pinned-model
+  `useState` drive the model-option filter and the reasoning disable (+ clear) when the pinned
+  model has `reasoning:false`; provider change auto-selects its first model; `handleSave`
+  forces `reasoningEffort:null` for non-reasoning pinned models.
+- Verification: lint 0, build ✓. Browser eyeball pending; nothing committed.
+
+## 2026-08-30 — Case 003: conversation message layout + streaming indicator (applied)
+
+- Reported (items 1–2): user requests must render right / assistant left, and while a request
+  is in flight until the response arrives, show MUI X Chat's built-in streaming indicator.
+  Recorded as Case 003 in `cases.md`.
+- Alignment root cause: every `MessageRow` was `display:flex` with default
+  `justifyContent:flex-start`, so both roles landed left; the cards' `alignSelf` only affects
+  the cross (vertical) axis, so it never moved a bubble sideways.
+- Streaming research (X Chat 9.0.0-alpha.17 source, driven via mui-mcp): with a custom
+  `renderItem` on headless `MessageList.Root` there is NO trailing streaming row and no
+  `features` flag — the flag + auto waiting row live only in the material `DefaultMessageItem`
+  we don't use. Reusable primitives confirmed + exports verified: `useStreamingIndicatorVisibility('auto')`
+  → `{waiting}` (headless) and `ChatStreamingIndicator` (dots) exported from
+  `@mui/x-chat/ChatIndicators`; `ChatStreamingIndicatorRow` is internal-only (not exported);
+  headless `renderItem` passes only `{id, index}`.
+- Fix: `MessageRow` `justifyContent` by role (user → flex-end); `StreamingWaitingRow` below
+  the list gated on `waiting` (assistant-styled bubble with the X Chat dots); built-in
+  `<ChatStreamingIndicator message={message} />` replaces the `▍` caret in the assistant
+  bubble; removed the misleading `alignSelf:'flex-end'` from the user card.
+- Verification: `npm run lint` 0, `npm run build` ✓ (dist removed). Live dev servers
+  :3000/:4000 untouched; browser eyeball pending. Nothing committed (commit on request only).
+- **R2 refinements (same day, user-requested):** user bubble recolored to match the assistant
+  (`background.paper` + `text.primary` + `divider` border instead of `primary.main`); scroll-to-bottom
+  affordance enabled via `overlay={<ChatScrollToBottomAffordance />}` on `MessageList.Root` —
+  `features={{scrollToBottom:true}}` is ChatBox-only and inert on our headless custom surface, so the
+  overlay is the exact equivalent (that's what ChatBox mounts internally). lint 0, build ✓.
+- **R3 (same day, edit-request refinements):** edit textarea fully expands (static 400px
+  `maxHeight`, subtle-scroll via wheel, scrollbar visually hidden) and the action-bar pencil swaps to
+  an **Update** check button (form linked via `id` + `form=` attribute); Update submits the inline form
+  (inline check button removed), collapses the card to its 2-line clamp, then the existing
+  `regenerate` flow removes everything below + streams the new reply. Strict user constraint: no
+  typing lag — the textarea stays `register('text')` uncontrolled (no Controller/watch/controlled
+  value added; only static CSS + button wiring). lint 0, build ✓ (dist removed); nothing committed.
+
+## 2026-08-30 — Case 003 R4: "edit never engages with a real click" (fix applied)
+
+- **Reported:** clicking the pencil expands the card but inline edit never engages (no textarea,
+  no pencil→✓ swap, can't type); user asked to compare against what worked before. Recorded as
+  Case 003 R4 in `cases.md`.
+- **Investigation:** the pencil's `openEdit` handler is byte-identical to the last-known-good
+  `482d01d` (full 3-file diff vs that commit obtained). Headless clean-Chrome repro (real CDP
+  mouse events) reproduced the exact symptom: a real click fires `pointerdown`+`click` on the Edit
+  button and expands a long card (line-clamp `2`→`none`) but edit mode never renders, while a
+  programmatic `el.click()` opens edit on both short and long cards. Ruled out: affordance overlay,
+  row recycling (stable `id` keys), roving focus (unused by custom rows), stale HMR (served module
+  curl-verified current). Suspects from the diff: the R3 `type="submit" form={formId}` cross-element
+  submit and the `autoFocus` on the now-auto-growing `maxHeight:400` textarea fighting the
+  virtualized list on real clicks.
+- **Fix (`MuiUserMessageCard.jsx` only):** Update (✓) button back to a plain
+  `IconButton onClick={handleSubmit(onSubmitEdit)}` — dropped `type="submit" form={formId}` and the
+  form `id`; textarea `autoFocus` removed, focus restored via `inputRef` +
+  `requestAnimationFrame` effect keyed on `editing`; all R3 behaviors kept (400px cap, hidden
+  scrollbar, pencil→✓ swap, collapse + regenerate on save). Text registers still uncontrolled.
+- **Verification:** `npm run lint` 0, `npm run build` ✓, `dist/` removed, servers untouched. User
+  directive: assistant does **no live testing** — user re-tests edit in the browser. Nothing
+  committed (commit on request only).
+
+## 2026-08-30 — Case 003 R5: edit width + truncate-below for Edit and Retry (applied)
+
+- **Reported:** edit now engages, but (1) the card width is wrong while editing; (2) after
+  Update, responses below the edited turn stay. User added: **Retry must behave identically** —
+  last response, and responses below a retried reply (removed). Recorded as Case 003 R5.
+- **Root cause:** (1) shrink-to-fit card — the multiline textarea's ~20ch intrinsic width
+  collapses the bubble in edit mode while display text wraps to the 78%/96% cap. (2) The X-Chat
+  runtime `regenerate` removes only the anchor's **assistant run** (`resolveRegenerateAnchor`:
+  assistant messages until the next user message), so later user turns + replies survive; the
+  runtime never patches the anchor's parts either, so edited text needed a reload; and that
+  reload **raced** — `pendingReloadRef` was set after the final store flush, so the `[messages]`
+  watcher missed its window and never fired. Retry reused the same runtime path with no reload at
+  all.
+- **Fix:** `MuiUserMessageCard.jsx` — `width: editing ? '100%' : undefined` on the card;
+  `onSubmitEdit` bails when streaming, then mirrors truncate-below into the store before
+  `regenerate` (`store.setMessages(ids.slice(0, anchorIndex+1))`, anchor parts swapped to the
+  trimmed text). `MuiAssistantMessageCard.jsx` — new `onSaved` prop; `handleRetry` resolves the
+  anchor (nearest preceding user message) and truncates below it the same way, then
+  `actions.regenerate(anchorId).then(onSaved)` (must pass the anchor user id — the assistant id
+  is gone after truncation and would resolve to null). `MuiChatSurface.jsx` — passes
+  `onSaved={onEdited}` to the assistant card. `ChatPage.jsx` — removed the racy
+  `pendingReloadRef` watcher (and the now-unused `useEffect` import/local vars);
+  `handleEdited(conversationId)` reloads deterministically once regeneration completes:
+  `reloadMessages(conversationId ?? chat.activeConversationId).then(() => reloadConversations())`.
+- **Verification:** lint 0, build ✓, `dist/` removed. User re-tests: edit width, edit
+  truncate-below, retry-last, retry-mid-thread in the browser. Nothing committed (commit on
+  request only).
+- **User review (R5):** ✓ Retry removes below responses (works); Edit truncate-below confirmed
+  working too. Reopened as R6: (1) Update icon must disable when content is unchanged; (2) the
+  regenerated reply "leaves a space" instead of replacing in place; (3) mouse wheel can't
+  scroll the edit textarea (keyboard arrows only).
+
+## 2026-08-30 — Case 003 R6: disable-unchanged Update, reply gap/space, edit-textarea wheel (applied)
+
+- **Reported:** (1) Update must be disabled while the content is unchanged; (2) after Update the
+  below-responses ARE gone and the reply streams, but it's "displayed leaving a space" instead
+  of replacing the old responses in place; (3) while the edit card is expanded, only keyboard
+  arrows scroll the long textarea — the mouse wheel doesn't.
+- **Root cause:** (1) nothing tracked content-changed. (2) `onSubmitEdit` forced
+  `setCollapsed(true)` on save → the long edited card re-rendered at its 2-line clamp+ellipsis
+  while its virtualized row still held the tall textarea-expanded height, leaving a blank spacer
+  between the edited message and the regenerated reply (`store.addMessage` appends the reply
+  correctly at the anchor, so placement was never a message-ordering bug). (3) the textarea is
+  the scroll container (keyboard proves it), but wheel events chain to the outer virtualized
+  scroller — the hidden-scrollbar CSS offers no wheel route.
+- **Fix:** `MuiUserMessageCard.jsx` — `dirty` state via RHF `register('text', { onChange })`
+  (no `watch`), reset in `openEdit`; Update IconButton `disabled={!dirty}`; removed
+  `setCollapsed(true)` from `onSubmitEdit` (card stays expanded, reply replaces in place);
+  `handleEditWheel` bound via `slotProps.htmlInput` (scrolls the textarea while it has overflow,
+  chains to the list only at boundaries); `onSaved` reload gated on the store actually gaining a
+  new message (`messageIds.length > truncatedLength`). `MuiAssistantMessageCard.jsx` — same
+  reload gate in `handleRetry`. Both cards: below-restore now unreachable on regenerate
+  skip/error.
+- **Verification:** lint 0, build ✓, `dist/` removed. User re-tests: disabled-until-changed
+  Update, no gap after Update, mouse-wheel scroll on the expanded edit textarea. Nothing
+  committed (commit on request only).

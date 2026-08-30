@@ -1,6 +1,7 @@
 import { Box, Alert, CircularProgress, IconButton, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useChat, useMessage, useMessageIds, MessageList } from '@mui/x-chat/headless';
+import { useChat, useMessage, useMessageIds, useStreamingIndicatorVisibility, MessageList } from '@mui/x-chat/headless';
+import { ChatStreamingIndicator, ChatScrollToBottomAffordance } from '@mui/x-chat/ChatIndicators';
 import { MuiAssistantMessageCard } from './MuiAssistantMessageCard.jsx';
 import { MuiUserMessageCard } from './MuiUserMessageCard.jsx';
 
@@ -20,6 +21,7 @@ import { MuiUserMessageCard } from './MuiUserMessageCard.jsx';
 export const MuiChatSurface = ({ onEdited }) => {
   const { messages, error, isLoadingHistory, setError } = useChat();
   const messageIds = useMessageIds();
+  const { waiting } = useStreamingIndicatorVisibility('auto');
 
   /**
    * Renders a single message row, branching on role.
@@ -74,16 +76,20 @@ export const MuiChatSurface = ({ onEdited }) => {
             </Typography>
           </Box>
         ) : (
-          <MessageList.Root
-            items={messageIds}
-            renderItem={renderItem}
-            autoScroll
-            enableRovingFocus={false}
-            slotProps={{
-              messageList: { className: 'selam-thread', style: { flex: 1, minHeight: 0 } },
-              messageListContent: { style: { padding: '12px 16px 8px' } },
-            }}
-          />
+          <>
+            <MessageList.Root
+              items={messageIds}
+              renderItem={renderItem}
+              autoScroll
+              enableRovingFocus={false}
+              overlay={<ChatScrollToBottomAffordance />}
+              slotProps={{
+                messageList: { className: 'selam-thread', style: { flex: 1, minHeight: 0 } },
+                messageListContent: { style: { padding: '12px 16px 8px' } },
+              }}
+            />
+            {waiting && <StreamingWaitingRow />}
+          </>
         )}
       </Box>
     </Box>
@@ -109,11 +115,43 @@ const MessageRow = ({ id, onEdited }) => {
       sx={{
         mb: 1.5,
         display: 'flex',
+        justifyContent: isUser ? 'flex-end' : 'flex-start',
         '&:hover .selam-msg-actions, &:hover .selam-user-msg-actions, &:focus-within .selam-msg-actions, &:focus-within .selam-user-msg-actions':
           { opacity: 1 },
       }}
     >
-      {isUser ? <MuiUserMessageCard messageId={id} onSaved={onEdited} /> : <MuiAssistantMessageCard messageId={id} />}
+      {isUser ? <MuiUserMessageCard messageId={id} onSaved={onEdited} /> : <MuiAssistantMessageCard messageId={id} onSaved={onEdited} />}
     </Box>
   );
 };
+
+/**
+ * The trailing "waiting" row shown by MUI X Chat while a response is in flight
+ * and no assistant message is streaming yet. Rendered below the message list,
+ * left-aligned like an assistant bubble.
+ *
+ * @returns {import('react').JSX.Element} The waiting bubble.
+ */
+const StreamingWaitingRow = () => (
+  <Box className="selam-waiting" sx={{ px: 2, pb: 1.5, display: 'flex', justifyContent: 'flex-start' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.5,
+        borderRadius: 2,
+        borderTopLeftRadius: 2,
+        px: 1.5,
+        py: 1,
+        bgcolor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+      }}
+    >
+      <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main' }}>
+        ሰላም
+      </Typography>
+      <ChatStreamingIndicator />
+    </Box>
+  </Box>
+);

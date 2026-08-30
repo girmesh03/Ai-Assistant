@@ -1,10 +1,10 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react';
-import { Box, IconButton, TextField, Tooltip } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
-import MicIcon from '@mui/icons-material/Mic';
-import StopCircleIcon from '@mui/icons-material/StopCircle';
-import { useChatComposer } from '@mui/x-chat/headless';
-import { useVoiceRecorder } from '../../hooks/useVoiceRecorder.js';
+import { forwardRef, useImperativeHandle, useRef } from "react";
+import { Box, IconButton, TextField, Tooltip } from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
+import MicIcon from "@mui/icons-material/Mic";
+import StopCircleIcon from "@mui/icons-material/StopCircle";
+import { useChatComposer } from "@mui/x-chat/headless";
+import { useVoiceRecorder } from "../../hooks/useVoiceRecorder.js";
 
 /**
  * The ሰላም message composer. Fully controlled through the runtime composer
@@ -38,7 +38,14 @@ import { useVoiceRecorder } from '../../hooks/useVoiceRecorder.js';
  * @returns {import('react').JSX.Element} The composer.
  */
 export const MuiChatComposer = forwardRef(function MuiChatComposer(
-  { onRequireConversation, isStreaming = false, onStopStreaming, onTranscribe, isTranscribing = false, placeholder = 'Send a message…' },
+  {
+    onRequireConversation,
+    isStreaming = false,
+    onStopStreaming,
+    onTranscribe,
+    isTranscribing = false,
+    placeholder = "Send a message…",
+  },
   ref,
 ) {
   const { value, setValue, submit, isSubmitting } = useChatComposer();
@@ -60,7 +67,7 @@ export const MuiChatComposer = forwardRef(function MuiChatComposer(
         setValue(text);
         inputRef.current?.focus();
       },
-      clear: () => setValue(''),
+      clear: () => setValue(""),
     }),
     [setValue],
   );
@@ -87,7 +94,7 @@ export const MuiChatComposer = forwardRef(function MuiChatComposer(
    * @returns {void}
    */
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void submitDraft();
     }
@@ -115,17 +122,23 @@ export const MuiChatComposer = forwardRef(function MuiChatComposer(
         event.preventDefault();
         void submitDraft();
       }}
-      sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, py: 1.5, px: { xs: 2, sm: 3 } }}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 0.5,
+        py: 1.5,
+        px: { xs: 2, sm: 3 },
+      }}
     >
       <Box
         sx={{
-          display: 'flex',
-          alignItems: 'flex-end',
+          display: "flex",
+          alignItems: "flex-end",
           gap: 0.5,
           border: 1,
-          borderColor: 'divider',
+          borderColor: "divider",
           borderRadius: 3,
-          bgcolor: 'background.paper',
+          bgcolor: "background.paper",
           px: 1.5,
           py: 0.5,
           boxShadow: 1,
@@ -147,32 +160,36 @@ export const MuiChatComposer = forwardRef(function MuiChatComposer(
           }}
           slotProps={{
             input: { disableUnderline: true },
-            htmlInput: { 'aria-label': 'Message ሰላም', sx: { py: 1 } },
+            htmlInput: { "aria-label": "Message ሰላም", sx: { py: 1 } },
           }}
           sx={{ flex: 1 }}
         />
 
         {isStreaming ? (
           <Tooltip title="Stop generating">
-            <IconButton size="small" aria-label="Stop generating" onClick={onStopStreaming}>
+            <IconButton
+              size="small"
+              aria-label="Stop generating"
+              onClick={onStopStreaming}
+            >
               <StopCircleIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         ) : (
-          <Tooltip title={isRecording ? 'Stop recording' : 'Talk to ሰላም'}>
+          <Tooltip title={isRecording ? "Stop recording" : "Talk to ሰላም"}>
             <IconButton
               size="small"
-              aria-label={isRecording ? 'Stop recording' : 'Talk to ሰላም'}
+              aria-label={isRecording ? "Stop recording" : "Talk to ሰላም"}
               onClick={handleMicClick}
-              sx={{ color: isRecording ? 'error.main' : 'text.secondary' }}
+              sx={{ color: isRecording ? "error.main" : "text.secondary" }}
             >
               <MicIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
 
-        <Tooltip title="Send">
-          <Box sx={{ display: 'flex' }}>
+        <Tooltip title="Send" placement="top">
+          <Box sx={{ display: "flex" }}>
             <IconButton
               size="small"
               aria-label="Send"
@@ -180,9 +197,9 @@ export const MuiChatComposer = forwardRef(function MuiChatComposer(
               disabled={!canSend}
               onClick={() => void submitDraft()}
               sx={{
-                bgcolor: canSend ? 'primary.main' : 'transparent',
-                color: canSend ? 'primary.contrastText' : 'text.disabled',
-                '&:hover': canSend ? { bgcolor: 'primary.dark' } : {},
+                bgcolor: canSend ? "primary.main" : "transparent",
+                color: canSend ? "primary.contrastText" : "text.disabled",
+                "&:hover": canSend ? { bgcolor: "primary.dark" } : {},
               }}
             >
               <SendIcon fontSize="small" />
@@ -192,7 +209,13 @@ export const MuiChatComposer = forwardRef(function MuiChatComposer(
       </Box>
 
       {isTranscribing && (
-        <Box sx={{ typography: 'caption', color: 'text.secondary', textAlign: 'center' }}>
+        <Box
+          sx={{
+            typography: "caption",
+            color: "text.secondary",
+            textAlign: "center",
+          }}
+        >
           Transcribing your voice…
         </Box>
       )}

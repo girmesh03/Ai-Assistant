@@ -22,7 +22,8 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import SaveIcon from '@mui/icons-material/Save';
-import { useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -69,7 +70,7 @@ export const MuiPresetDialog = ({ onApply }) => {
   const [deletePreset] = useDeletePresetMutation();
   const { data: models = [] } = useGetModelsQuery();
 
-  const { register, handleSubmit, setValue, getValues, reset } = useForm({
+  const { register, handleSubmit, control, setValue, reset } = useForm({
     defaultValues: {
       name: '',
       prompt: '',
@@ -79,6 +80,22 @@ export const MuiPresetDialog = ({ onApply }) => {
       reasoningEffort: '',
     },
   });
+
+  /** The provider chosen in the form, mirrored for reactive model filtering. */
+  const [providerId, setProviderId] = useState('');
+
+  /** The currently pinned catalog model (provider+model), or null. */
+  const [pinnedModel, setPinnedModel] = useState(null);
+
+  /**
+   * Looks up a catalog model by provider + model ids.
+   *
+   * @param {string} providerIdValue - Provider id, or ''.
+   * @param {string} modelIdValue - Model id, or ''.
+   * @returns {import('../../redux/features/metaSlice.js').AvailableModel | null} The model, or null.
+   */
+  const findModel = (providerIdValue, modelIdValue) =>
+    models.find((model) => model.providerId === providerIdValue && model.id === modelIdValue) ?? null;
 
   /**
    * Enters create or edit mode for a preset, pre-filling the form.
@@ -95,6 +112,10 @@ export const MuiPresetDialog = ({ onApply }) => {
       modelProviderId: preset?.modelProviderId ?? '',
       reasoningEffort: preset?.reasoningEffort ?? '',
     });
+    setProviderId(preset?.modelProviderId ?? '');
+    const pinned = findModel(preset?.modelProviderId ?? '', preset?.modelId ?? '');
+    setPinnedModel(pinned);
+    if (pinned && pinned.reasoning !== true) setValue('reasoningEffort', '');
     dispatch(openPresetEditor(preset ? preset._id : NEW_PRESET_SENTINEL));
   };
 
@@ -107,13 +128,14 @@ export const MuiPresetDialog = ({ onApply }) => {
    * @returns {void}
    */
   const handleSave = ({ name, prompt, persona, modelId, modelProviderId, reasoningEffort }) => {
+    const pinned = findModel(modelProviderId ?? '', modelId ?? '');
     const payload = {
       name: name.trim(),
       prompt: prompt.trim(),
       persona: persona.trim() || null,
       modelProviderId: modelProviderId || null,
       modelId: modelId || null,
-      reasoningEffort: reasoningEffort || null,
+      reasoningEffort: pinned && pinned.reasoning !== true ? null : reasoningEffort || null,
     };
     const saving =
       editingId === NEW_PRESET_SENTINEL ? createPreset(payload) : updatePreset({ id: editingId, ...payload });
@@ -156,7 +178,6 @@ export const MuiPresetDialog = ({ onApply }) => {
   };
 
   const isSaving = isCreating || isUpdating;
-  const selectedProvider = getValues('modelProviderId');
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" aria-labelledby="preset-dialog-title">
@@ -243,52 +264,97 @@ export const MuiPresetDialog = ({ onApply }) => {
               <TextField size="small" required multiline minRows={3} label="System prompt" fullWidth {...register('prompt')} />
               <TextField size="small" multiline minRows={2} label="Persona (optional)" fullWidth {...register('persona')} />
               <Stack direction="row" spacing={1.5}>
-                <TextField
-                  size="small"
-                  select
-                  label="Provider (optional)"
-                  fullWidth
-                  value={getValues('modelProviderId')}
-                  {...register('modelProviderId', {
-                    onChange: (event) => {
-                      const provider = event.target.value;
-                      const first = models.find((model) => model.providerId === provider);
-                      setValue('modelId', first?.id ?? '');
-                    },
-                  })}
-                >
-                  <MenuItem value="">
-                    <em>Not set</em>
-                  </MenuItem>
-                  {deriveProviders(models).map((provider) => (
-                    <MenuItem key={provider.providerId} value={provider.providerId}>
-                      {provider.providerName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField size="small" select label="Model (optional)" fullWidth value={getValues('modelId')} {...register('modelId')}>
-                  <MenuItem value="">
-                    <em>Not set</em>
-                  </MenuItem>
-                  {models
-                    .filter((model) => !selectedProvider || model.providerId === selectedProvider)
-                    .map((model) => (
-                      <MenuItem key={`${model.providerId}/${model.id}`} value={model.id}>
-                        {model.name}
+                <Controller
+                  name="modelProviderId"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      size="small"
+                      select
+                      label="Provider (optional)"
+                      fullWidth
+                      value={field.value ?? ''}
+                      onChange={(event) => {
+                        const provider = event.target.value;
+                        field.onChange(provider);
+                        const first = models.find((model) => model.providerId === provider) ?? null;
+                        setProviderId(provider);
+                        setPinnedModel(first);
+                        setValue('modelId', first?.id ?? '');
+                        if (first && first.reasoning !== true) setValue('reasoningEffort', '');
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>Not set</em>
                       </MenuItem>
-                    ))}
-                </TextField>
+                      {deriveProviders(models).map((provider) => (
+                        <MenuItem key={provider.providerId} value={provider.providerId}>
+                          {provider.providerName}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+                <Controller
+                  name="modelId"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      size="small"
+                      select
+                      label="Model (optional)"
+                      fullWidth
+                      value={field.value ?? ''}
+                      onChange={(event) => {
+                        const modelId = event.target.value;
+                        field.onChange(modelId);
+                        const pinned = findModel(providerId, modelId);
+                        setPinnedModel(pinned);
+                        if (pinned && pinned.reasoning !== true) setValue('reasoningEffort', '');
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>Not set</em>
+                      </MenuItem>
+                      {models
+                        .filter((model) => !providerId || model.providerId === providerId)
+                        .map((model) => (
+                          <MenuItem key={`${model.providerId}/${model.id}`} value={model.id}>
+                            {model.name}
+                          </MenuItem>
+                        ))}
+                    </TextField>
+                  )}
+                />
               </Stack>
-              <TextField size="small" select label="Reasoning (optional)" fullWidth value={getValues('reasoningEffort')} {...register('reasoningEffort')}>
-                <MenuItem value="">
-                  <em>Not set</em>
-                </MenuItem>
-                {REASONING_LEVELS.map((level) => (
-                  <MenuItem key={level} value={level}>
-                    {REASONING_LABELS[level]}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Controller
+                name="reasoningEffort"
+                control={control}
+                render={({ field }) => {
+                  const reasoningUnavailable = pinnedModel != null && pinnedModel.reasoning !== true;
+                  return (
+                    <TextField
+                      size="small"
+                      select
+                      label="Reasoning (optional)"
+                      fullWidth
+                      value={field.value ?? ''}
+                      disabled={reasoningUnavailable}
+                      onChange={field.onChange}
+                      helperText={reasoningUnavailable ? 'This model does not support reasoning.' : undefined}
+                    >
+                      <MenuItem value="">
+                        <em>Not set</em>
+                      </MenuItem>
+                      {REASONING_LEVELS.map((level) => (
+                        <MenuItem key={level} value={level}>
+                          {REASONING_LABELS[level]}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  );
+                }}
+              />
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                 <Button size="small" onClick={() => dispatch(openPresetDialog())}>
                   Cancel

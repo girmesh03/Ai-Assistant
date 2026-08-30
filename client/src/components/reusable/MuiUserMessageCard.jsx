@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Box, IconButton, TextField, Tooltip, Typography } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
@@ -7,7 +7,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
-import { useMessage, useChatActions } from '@mui/x-chat/headless';
+import { useMessage, useChatActions, useChatStore } from '@mui/x-chat/headless';
 import { partsToText, formatTime } from '../../utils/format.js';
 import { chatAdapter } from '../../adapters/chatAdapter.js';
 
@@ -29,20 +29,51 @@ import { chatAdapter } from '../../adapters/chatAdapter.js';
 export const MuiUserMessageCard = ({ messageId, onSaved }) => {
   const message = useMessage(messageId);
   const actions = useChatActions();
+  const store = useChatStore();
   const [collapsed, setCollapsed] = useState(true);
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const { register, handleSubmit, setValue } = useForm({
     defaultValues: { text: '' },
   });
+
+  /** Ref to the inline edit textarea, so edit mode can focus it without relying on `autoFocus` (which fights the virtualized list's scroll on mount). */
+  const editInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!editing) return undefined;
+    const frame = window.requestAnimationFrame(() => editInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [editing]);
 
   if (!message) return null;
 
   const text = partsToText(message.parts.filter((part) => part.type === 'text'));
 
   /** @type {import('react-hook-form').UseFormRegisterReturn<'text'>} */
-  const textFieldProps = register('text');
+  const textFieldProps = register('text', {
+    onChange: () => setDirty(true),
+  });
+
+  /**
+   * Routes the mouse wheel to the edit textarea so it scrolls on its own while
+   * it has overflow. At its top/bottom boundary the event is left untouched so
+   * the message list scrolls instead.
+   *
+   * @param {import('react').WheelEvent<HTMLTextAreaElement>} event - Wheel event.
+   * @returns {void}
+   */
+  const handleEditWheel = (event) => {
+    const el = event.currentTarget;
+    if (el.scrollHeight <= el.clientHeight) return;
+    const atTop = el.scrollTop <= 0;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    if ((atTop && event.deltaY < 0) || (atBottom && event.deltaY > 0)) return;
+    event.preventDefault();
+    el.scrollTop += event.deltaY;
+  };
 
   /**
    * Copies the request text to the clipboard.
@@ -66,6 +97,7 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
     setValue('text', text);
     setCollapsed(false);
     setEditing(true);
+    setDirty(false);
   };
 
   /**
@@ -77,13 +109,26 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
    * @returns {void}
    */
   const onSubmitEdit = ({ text: editedText }) => {
-    if (!editedText.trim() || editedText.trim() === text) {
+    const trimmed = editedText.trim();
+    if (!trimmed || trimmed === text) {
       setEditing(false);
       return;
     }
-    chatAdapter.stageEditedText(message.id, editedText);
+    if (store.state.isStreaming) return;
+    chatAdapter.stageEditedText(message.id, trimmed);
+
+    const ids = store.state.messageIds;
+    const anchorIndex = ids.indexOf(message.id);
+    if (anchorIndex !== -1) {
+      const updated = ids.slice(0, anchorIndex + 1).map((id) => store.state.messagesById[id]);
+      updated[updated.length - 1] = { ...updated[updated.length - 1], parts: [{ type: 'text', text: trimmed }] };
+      store.setMessages(updated);
+    }
+    const truncatedLength = store.state.messageIds.length;
+
     void actions.regenerate(message.id).then(() => {
-      if (onSaved && message.conversationId) onSaved(message.conversationId);
+      const streamed = store.state.messageIds.length > truncatedLength;
+      if (streamed && onSaved && message.conversationId) onSaved(message.conversationId);
     });
     setEditing(false);
   };
@@ -94,8 +139,8 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
     <Box
       className="selam-user-msg"
       sx={{
-        alignSelf: 'flex-end',
         maxWidth: { xs: '96%', md: '78%' },
+        width: editing ? '100%' : undefined,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
@@ -110,8 +155,10 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
           borderRadius: 2,
           borderTopRightRadius: 2,
           p: 1.25,
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          border: 1,
+          borderColor: 'divider',
           width: '100%',
         }}
       >
@@ -120,15 +167,13 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
             component="form"
             onSubmit={handleSubmit(onSubmitEdit)}
             noValidate
-            sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}
+            sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}
           >
             <TextField
               size="small"
               fullWidth
               multiline
-              minRows={1}
-              maxRows={4}
-              autoFocus
+              inputRef={editInputRef}
               {...textFieldProps}
               variant="standard"
               slotProps={{
@@ -136,19 +181,19 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
                   disableUnderline: true,
                   sx: {
                     color: 'inherit',
-                    '& textarea': { color: 'inherit', fontSize: '0.875rem' },
+                    '& textarea': {
+                      color: 'inherit',
+                      fontSize: '0.875rem',
+                      maxHeight: 400,
+                      overflowY: 'auto',
+                      scrollbarWidth: 'none',
+                      '&::-webkit-scrollbar': { display: 'none' },
+                    },
                   },
                 },
-                htmlInput: { 'aria-label': 'Edit message' },
+                htmlInput: { 'aria-label': 'Edit message', onWheel: handleEditWheel },
               }}
             />
-            <Tooltip title="Update">
-              <Box sx={{ display: 'flex' }}>
-                <IconButton size="small" type="submit" aria-label="Update" sx={{ color: 'inherit' }}>
-                  <CheckIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Tooltip>
           </Box>
         ) : (
           <Typography
@@ -175,14 +220,20 @@ export const MuiUserMessageCard = ({ messageId, onSaved }) => {
             {copied ? <CheckIcon fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
-        {!editing && (
+        {editing ? (
+          <Tooltip title="Update">
+            <IconButton size="small" aria-label="Update" onClick={handleSubmit(onSubmitEdit)} disabled={!dirty}>
+              <CheckIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : (
           <Tooltip title="Edit">
             <IconButton size="small" aria-label="Edit" onClick={openEdit}>
               <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
-        {isLong && (
+        {isLong && !editing && (
           <Tooltip title={collapsed ? 'Expand' : 'Collapse'}>
             <IconButton size="small" aria-label={collapsed ? 'Expand' : 'Collapse'} onClick={() => setCollapsed((v) => !v)}>
               {collapsed ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowUpIcon fontSize="small" />}

@@ -3,6 +3,7 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 import { baseApi } from './baseApi.js';
 import { metaSlice, metaListener, metaApi } from './features/metaSlice.js';
 import { presetsSlice } from './features/presetsSlice.js';
+import { settingsSlice } from './features/settingsSlice.js';
 import { speechSlice } from './features/speechSlice.js';
 
 /**
@@ -16,6 +17,7 @@ export const store = configureStore({
     [baseApi.reducerPath]: baseApi.reducer,
     [metaSlice.name]: metaSlice.reducer,
     [presetsSlice.name]: presetsSlice.reducer,
+    [settingsSlice.name]: settingsSlice.reducer,
     [speechSlice.name]: speechSlice.reducer,
   },
   middleware: (getDefaultMiddleware) =>

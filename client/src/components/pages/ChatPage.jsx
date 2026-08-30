@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   AppBar,
   Box,
@@ -29,14 +29,18 @@ import {
   openPresetDialog,
   useListPresetsQuery,
 } from "../../redux/features/presetsSlice.js";
-import { selectDefaultModelPair } from "../../redux/features/metaSlice.js";
-import { BRAND_NAME } from "../../utils/constants.js";
+import {
+  selectDefaultModelPair,
+  selectModelInfo,
+} from "../../redux/features/metaSlice.js";
+import { selectSettings, updateSettings } from "../../redux/features/settingsSlice.js";
+import { BRAND_NAME, languagesForModel } from "../../utils/constants.js";
 import { formatTime, truncate } from "../../utils/format.js";
 import { MuiChatConversationList } from "../reusable/MuiChatConversationList.jsx";
 import { MuiChatComposer } from "../reusable/MuiChatComposer.jsx";
 import { MuiChatSurface } from "../reusable/MuiChatSurface.jsx";
 import { MuiEmptyState } from "../reusable/MuiEmptyState.jsx";
-import { MuiLanguagePill } from "../reusable/MuiLanguagePill.jsx";
+import { MuiLanguageSelector } from "../reusable/MuiLanguageSelector.jsx";
 import { MuiModelSelector } from "../reusable/MuiModelSelector.jsx";
 import { MuiPresetDialog } from "../reusable/MuiPresetDialog.jsx";
 import { MuiReasoningSelector } from "../reusable/MuiReasoningSelector.jsx";
@@ -44,6 +48,12 @@ import { MuiReasoningSelector } from "../reusable/MuiReasoningSelector.jsx";
 /**
  * The ሰላም chat page: runtime-wrapped workspace that composes the sidebar,
  * thread (header, virtualized message list, composer) and welcome/empty states.
+ *
+ * The conversation settings (language, reasoning, model, preset) are always
+ * visible — on the desktop header row or the mobile AppBar — so the user can
+ * pick them before the first chat. When no conversation is active the pickers
+ * reflect the pre-chat `settings` slice; once a conversation exists they
+ * reflect that conversation's metadata and every change writes through to it.
  *
  * @module components/pages/ChatPage
  */
@@ -71,6 +81,7 @@ const ChatPageInner = () => {
   const dispatch = useDispatch();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const composerRef = useRef(
@@ -78,7 +89,6 @@ const ChatPageInner = () => {
       null
     ),
   );
-  const pendingReloadRef = useRef(false);
 
   const activeConversation =
     chat.conversations.find(
@@ -86,11 +96,28 @@ const ChatPageInner = () => {
     ) ?? null;
   const metadata = activeConversation?.metadata ?? null;
 
+  const settings = useSelector(selectSettings);
   const { data: presets = [] } = useListPresetsQuery();
   const activePreset =
     presets.find((preset) => preset._id === metadata?.presetId) ?? null;
   const canCreateChat = useSelector(selectDefaultModelPair) !== null;
   const isTranscribing = useSelector(selectSpeechStatus) === "transcribing";
+
+  const displayProviderId = activeConversation
+    ? metadata?.modelProviderId
+    : settings.modelProviderId;
+  const displayModelId = activeConversation ? metadata?.modelId : settings.modelId;
+  const modelInfo = useSelector((root) =>
+    selectModelInfo(root, { providerId: displayProviderId, modelId: displayModelId }),
+  );
+  const supportsReasoning = modelInfo?.reasoning === true;
+  const languageOptions = languagesForModel(modelInfo?.id ?? displayModelId);
+  const currentLanguage = activeConversation
+    ? metadata?.language ?? "en"
+    : settings.language ?? "en";
+
+  /** The Add button only appears once at least one conversation exists. */
+  const showAddIcon = canCreateChat && chat.conversations.length > 0;
 
   /**
    * Guarantees an active conversation exists before a send.
@@ -115,7 +142,8 @@ const ChatPageInner = () => {
   };
 
   /**
-   * Persists a conversation field change (model/reasoning) + refreshes the list.
+   * Persists a conversation field change (model/reasoning/language) + refreshes
+   * the list.
    *
    * @param {object} patch - Conversation fields to patch.
    * @returns {Promise<void>}
@@ -141,37 +169,87 @@ const ChatPageInner = () => {
   };
 
   /**
-   * Marks that an edited message was regenerated, so the store re-syncs from
-   * the backend once the new reply finishes streaming.
+   * Persists a language change: updates the pre-chat settings and, when a
+   * conversation is active, PATCHes it.
    *
+   * @param {string} language - The new language code.
    * @returns {void}
    */
-  const handleEdited = useCallback(() => {
-    pendingReloadRef.current = true;
-  }, []);
-
-  const messages = chat.messages;
-  const activeConversationId = chat.activeConversationId;
-
-  useEffect(() => {
-    if (!pendingReloadRef.current || messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    const busy = last.parts.some((part) => part.state === "streaming");
-    if (busy) return;
-    pendingReloadRef.current = false;
-    const conversationId = last.conversationId ?? activeConversationId;
-    if (!conversationId) return;
-    void reloadMessages(conversationId).then(() => reloadConversations());
-  }, [messages, activeConversationId, reloadMessages, reloadConversations]);
+  const handleLanguageChange = (language) => {
+    dispatch(updateSettings({ language }));
+    if (chat.activeConversationId) {
+      void updateConversation({ language });
+    }
+  };
 
   /**
-   * Transcribes recorded voice and drops the text into the composer.
+   * Persists a reasoning change: updates the pre-chat settings and, when a
+   * conversation is active, PATCHes it.
+   *
+   * @param {string} value - The new reasoning effort.
+   * @returns {void}
+   */
+  const handleReasoningChange = (value) => {
+    dispatch(updateSettings({ reasoningEffort: value }));
+    if (chat.activeConversationId) {
+      void updateConversation({ reasoningEffort: value });
+    }
+  };
+
+  /**
+   * Parses a model-selector value into provider + model ids. Updates the
+   * pre-chat settings; if the current language is not supported by the new
+   * model it falls back to `en`; when a conversation is active, PATCHes it.
+   *
+   * @param {string} encoded - `${provider}/${model}` value from the selector.
+   * @returns {void}
+   */
+  const handleModelChange = (encoded) => {
+    const [modelProviderId, modelId] = encoded.split("/");
+    if (!modelProviderId || !modelId) return;
+    dispatch(updateSettings({ modelProviderId, modelId }));
+
+    const patch = /** @type {{ modelProviderId: string, modelId: string, language?: string }} */ ({
+      modelProviderId,
+      modelId,
+    });
+    const activeLanguage = activeConversation ? metadata?.language : settings.language;
+    if (activeLanguage && !languagesForModel(modelId).includes(activeLanguage)) {
+      patch.language = "en";
+      dispatch(updateSettings({ language: "en" }));
+    }
+    if (chat.activeConversationId) {
+      void updateConversation(patch);
+    }
+  };
+
+  /**
+   * Runs after an Edit or Retry finishes regenerating: the reply is in the
+   * store (or streaming finished), so re-sync the thread and conversation list
+   * from the backend, which owns the authoritative truncate-below result.
+   *
+   * @param {string} [conversationId] - The conversation that changed.
+   * @returns {void}
+   */
+  const handleEdited = useCallback(
+    (conversationId) => {
+      void reloadMessages(conversationId ?? chat.activeConversationId).then(() => reloadConversations());
+    },
+    [chat.activeConversationId, reloadMessages, reloadConversations],
+  );
+
+  /**
+   * Transcribes recorded voice and drops the text into the composer. Uses the
+   * active conversation's language, or the pre-chat settings before any
+   * conversation exists.
    *
    * @param {Blob} audio - Recorded blob.
    * @returns {void}
    */
   const handleTranscribe = (audio) => {
-    const language = metadata?.language ?? "en";
+    const language = activeConversation
+      ? metadata?.language ?? "en"
+      : settings.language ?? "en";
     void dispatch(transcribeAudio({ audio, language }))
       .unwrap()
       .then((text) => {
@@ -202,20 +280,107 @@ const ChatPageInner = () => {
     void conversationActions.deleteChat(chat.activeConversationId);
   };
 
-  /**
-   * Parses a model-selector value into provider + model ids.
-   *
-   * @param {string} encoded - `${provider}/${model}` value from the selector.
-   * @returns {void}
-   */
-  const handleModelChange = (encoded) => {
-    const [modelProviderId, modelId] = encoded.split("/");
-    if (modelProviderId && modelId)
-      void updateConversation({ modelProviderId, modelId });
-  };
-
   const sidebar = (
     <MuiChatConversationList onNavigate={() => setDrawerOpen(false)} />
+  );
+
+  const desktopControls = (
+    <>
+      <MuiLanguageSelector
+        value={currentLanguage}
+        options={languageOptions}
+        onChange={handleLanguageChange}
+      />
+
+      {supportsReasoning && (
+        <MuiReasoningSelector
+          value={metadata?.reasoningEffort ?? settings.reasoningEffort ?? "off"}
+          onChange={handleReasoningChange}
+        />
+      )}
+
+      <MuiModelSelector
+        providerId={displayProviderId}
+        modelId={displayModelId}
+        onChange={handleModelChange}
+      />
+
+      {activeConversation && activePreset ? (
+        <Tooltip title="Remove preset" placement="top">
+          <Chip
+            size="small"
+            icon={<AutoAwesomeIcon />}
+            label={activePreset.name}
+            onDelete={() => void conversationActions.removePresetFromActive()}
+            color="warning"
+            variant="outlined"
+            sx={{ typography: "caption", fontWeight: 600 }}
+          />
+        </Tooltip>
+      ) : (
+        <Tooltip title="Apply a preset" placement="top">
+          <IconButton
+            size="small"
+            aria-label="Apply a preset"
+            onClick={() => dispatch(openPresetDialog())}
+          >
+            <AutoAwesomeIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+
+      {activeConversation && (
+        <Tooltip title="Delete conversation" placement="top">
+          <IconButton
+            size="small"
+            aria-label="Delete conversation"
+            onClick={handleDeleteActive}
+          >
+            <DeleteOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+    </>
+  );
+
+  const mobileControls = (
+    <>
+      <MuiLanguageSelector
+        value={currentLanguage}
+        options={languageOptions}
+        onChange={handleLanguageChange}
+        compact={isXs}
+        slim={!isXs}
+      />
+
+      {supportsReasoning && (
+        <MuiReasoningSelector
+          value={metadata?.reasoningEffort ?? settings.reasoningEffort ?? "off"}
+          onChange={handleReasoningChange}
+          compact={isXs}
+          slim={!isXs}
+        />
+      )}
+
+      <MuiModelSelector
+        providerId={displayProviderId}
+        modelId={displayModelId}
+        onChange={handleModelChange}
+        compact={isXs}
+        slim={!isXs}
+      />
+
+      <Tooltip title="Apply a preset" placement="top">
+        <IconButton
+          size="small"
+          aria-label="Apply a preset"
+          onClick={() => dispatch(openPresetDialog())}
+          sx={{ color: "text.secondary" }}
+        >
+          <AutoAwesomeIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </>
   );
 
   return (
@@ -234,7 +399,7 @@ const ChatPageInner = () => {
           elevation={0}
           sx={{ borderBottom: 1, borderColor: "divider" }}
         >
-          <Toolbar variant="dense" sx={{ gap: 1 }}>
+          <Toolbar variant="dense" sx={{ gap: 1, px: 1.5 }}>
             <IconButton
               size="small"
               edge="start"
@@ -248,6 +413,7 @@ const ChatPageInner = () => {
                 fontFamily: "display",
                 fontSize: "1.15rem",
                 flex: 1,
+                minWidth: 0,
                 userSelect: "none",
               }}
             >
@@ -256,16 +422,20 @@ const ChatPageInner = () => {
                 .
               </Box>
             </Typography>
-            <Tooltip title="New chat">
-              <IconButton
-                size="small"
-                aria-label="New chat"
-                onClick={() => void conversationActions.createChat()}
-                disabled={!canCreateChat}
-              >
-                <AddIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+              {mobileControls}
+            </Box>
+            {showAddIcon && (
+              <Tooltip title="New chat" placement="top">
+                <IconButton
+                  size="small"
+                  aria-label="New chat"
+                  onClick={() => void conversationActions.createChat()}
+                >
+                  <AddIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Toolbar>
         </AppBar>
       )}
@@ -303,7 +473,7 @@ const ChatPageInner = () => {
             flexDirection: "column",
           }}
         >
-          {activeConversation && (
+          {!isMobile && (
             <Box
               sx={{
                 px: 2.5,
@@ -317,69 +487,31 @@ const ChatPageInner = () => {
                 bgcolor: "background.paper",
               }}
             >
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography
-                  variant="subtitle1"
-                  noWrap
-                  sx={{ fontWeight: 700, lineHeight: 1.25 }}
-                >
-                  {truncate(activeConversation.title || "New chat", 48)}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  {formatTime(activeConversation.lastMessageAt)}
-                </Typography>
-              </Box>
-
-              <MuiLanguagePill language={metadata?.language} />
-
-              <MuiReasoningSelector
-                value={metadata?.reasoningEffort ?? "off"}
-                onChange={(value) =>
-                  void updateConversation({ reasoningEffort: value })
-                }
-              />
-
-              <MuiModelSelector
-                providerId={metadata?.modelProviderId}
-                modelId={metadata?.modelId}
-                onChange={handleModelChange}
-              />
-
-              {activePreset ? (
-                <Tooltip title="Remove preset">
-                  <Chip
-                    size="small"
-                    icon={<AutoAwesomeIcon />}
-                    label={activePreset.name}
-                    onDelete={() =>
-                      void conversationActions.removePresetFromActive()
-                    }
-                    color="warning"
-                    variant="outlined"
-                    sx={{ typography: "caption", fontWeight: 600 }}
-                  />
-                </Tooltip>
-              ) : (
-                <Tooltip title="Apply a preset">
-                  <IconButton
-                    size="small"
-                    aria-label="Apply a preset"
-                    onClick={() => dispatch(openPresetDialog())}
+              {activeConversation && (
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography
+                    variant="subtitle1"
+                    noWrap
+                    sx={{ fontWeight: 700, lineHeight: 1.25 }}
                   >
-                    <AutoAwesomeIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                    {truncate(activeConversation.title || "New chat", 48)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {formatTime(activeConversation.lastMessageAt)}
+                  </Typography>
+                </Box>
               )}
 
-              <Tooltip title="Delete conversation">
-                <IconButton
-                  size="small"
-                  aria-label="Delete conversation"
-                  onClick={handleDeleteActive}
-                >
-                  <DeleteOutlinedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              <Box
+                sx={{
+                  ml: "auto",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.25,
+                }}
+              >
+                {desktopControls}
+              </Box>
             </Box>
           )}
 

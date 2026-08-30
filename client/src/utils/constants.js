@@ -19,6 +19,39 @@ export const TITLE_FROM_MESSAGE_MAX_LENGTH = 60;
 /** Supported assistant languages (must match backend `constants.LANGUAGES`). */
 export const SUPPORTED_LANGUAGES = Object.freeze(['en', 'am', 'om']);
 
+/**
+ * Language options per model id. Addis AI natively supports am/om/en; the
+ * OpenAI-compatible providers have no forced-language param, so only en/am are
+ * offered there (choosing am is cosmetic — those adapters ignore `language`).
+ *
+ * @type {Readonly<Record<string, ReadonlyArray<string>>>}
+ */
+export const MODEL_LANGUAGES = Object.freeze({
+  'addis-1-alef': ['en', 'am', 'om'],
+  'gemini-3.6-flash': ['en', 'am'],
+  'openai/gpt-oss-120b': ['en', 'am'],
+  'qwen/qwen3-32b': ['en', 'am'],
+  'deepseek/deepseek-r1:free': ['en', 'am'],
+});
+
+/** Fallback language set for models not listed in `MODEL_LANGUAGES`. */
+export const DEFAULT_MODEL_LANGUAGES = Object.freeze(['en', 'am']);
+
+/**
+ * Resolves the language choices available for a model id.
+ *
+ * @param {string} modelId - The model id to look up.
+ * @returns {ReadonlyArray<string>} The languages the model may use.
+ */
+export const languagesForModel = (modelId) => (MODEL_LANGUAGES[modelId] ?? DEFAULT_MODEL_LANGUAGES);
+
+/** Display labels keyed by ISO language code. */
+export const LANGUAGE_LABELS = Object.freeze({
+  en: 'English',
+  am: 'Amharic',
+  om: 'Oromo',
+});
+
 /** Reasoning-effort levels (must match backend `constants.REASONING_LEVELS`). */
 export const REASONING_LEVELS = Object.freeze(['off', 'low', 'medium', 'high']);
 

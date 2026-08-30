@@ -4,6 +4,8 @@ import { useChat } from '@mui/x-chat/headless';
 import { chatAdapter } from '../adapters/chatAdapter.js';
 import { useChatReload } from './useChatReload.js';
 import { useGetModelsQuery } from '../redux/features/metaSlice.js';
+import { selectSettings } from '../redux/features/settingsSlice.js';
+import { useSelector } from 'react-redux';
 
 /**
  * Conversation lifecycle actions shared by the sidebar, header, and preset
@@ -17,16 +19,20 @@ import { useGetModelsQuery } from '../redux/features/metaSlice.js';
 
 /**
  * Resolves the provider/model to use for a new conversation: the preset pins it
- * when present, otherwise the catalog default. Returns null when the catalog
- * has not loaded yet.
+ * when present, otherwise the pre-chat settings pick, otherwise the catalog
+ * default. Returns null when nothing is resolvable yet.
  *
  * @param {object|null} preset - Optional preset with `modelProviderId`/`modelId`.
+ * @param {{ providerId: string|null, modelId: string|null }} settings - Pre-chat settings pair.
  * @param {{ providerId: string, modelId: string } | null} defaults - Catalog defaults.
  * @returns {{ providerId: string, modelId: string } | null} The pair to use.
  */
-const resolveModelPair = (preset, defaults) => {
+const resolveModelPair = (preset, settings, defaults) => {
   if (preset?.modelProviderId && preset?.modelId) {
     return { providerId: preset.modelProviderId, modelId: preset.modelId };
+  }
+  if (settings.modelProviderId && settings.modelId) {
+    return { providerId: settings.modelProviderId, modelId: settings.modelId };
   }
   if (!defaults) {
     return null;
@@ -56,25 +62,30 @@ export const useConversationActions = () => {
   const { activeConversationId, setActiveConversation } = useChat();
   const { reloadConversations } = useChatReload();
   const { data: models = [], isLoading, isError } = useGetModelsQuery();
+  const settings = useSelector(selectSettings);
   const defaults = useMemo(
     () => (models.length > 0 ? { providerId: models[0].providerId, modelId: models[0].id } : null),
     [models],
   );
 
   /**
-   * Creates a fresh default conversation and navigates to it.
+   * Creates a fresh conversation seeded with the pre-chat settings (language,
+   * reasoning effort, model) and navigates to it.
    *
    * @returns {Promise<object|null>} The created conversation, or null on failure.
    */
   const createChat = useCallback(async () => {
-    if (!defaults) {
+    const pair = resolveModelPair(null, settings, defaults);
+    if (!pair) {
       toast.error(modelsUnavailableMessage(isLoading, isError));
       return null;
     }
     try {
       const conversation = await chatAdapter.createConversation({
-        modelProviderId: defaults.providerId,
-        modelId: defaults.modelId,
+        modelProviderId: pair.providerId,
+        modelId: pair.modelId,
+        reasoningEffort: settings.reasoningEffort ?? 'off',
+        language: settings.language ?? 'en',
       });
       await setActiveConversation(conversation.id);
       await reloadConversations();
@@ -83,7 +94,7 @@ export const useConversationActions = () => {
       toast.error(error?.message ?? 'Could not start a new chat.');
       return null;
     }
-  }, [defaults, isLoading, isError, reloadConversations, setActiveConversation]);
+  }, [settings, defaults, isLoading, isError, reloadConversations, setActiveConversation]);
 
   /**
    * Deletes a conversation and returns to the empty state when it was active.
@@ -117,7 +128,7 @@ export const useConversationActions = () => {
    */
   const applyPreset = useCallback(
     async (preset) => {
-      const pair = resolveModelPair(preset, defaults);
+      const pair = resolveModelPair(preset, settings, defaults);
       if (!pair) {
         toast.error(modelsUnavailableMessage(isLoading, isError));
         return;
@@ -141,6 +152,8 @@ export const useConversationActions = () => {
             ...fields,
             modelProviderId: pair.providerId,
             modelId: pair.modelId,
+            reasoningEffort: preset.reasoningEffort ?? settings.reasoningEffort ?? 'off',
+            language: settings.language ?? 'en',
           });
           await setActiveConversation(conversation.id);
           await reloadConversations();
@@ -150,7 +163,7 @@ export const useConversationActions = () => {
         toast.error(error?.message ?? 'Could not apply the preset.');
       }
     },
-    [activeConversationId, defaults, isLoading, isError, reloadConversations, setActiveConversation],
+    [activeConversationId, settings, defaults, isLoading, isError, reloadConversations, setActiveConversation],
   );
 
   /**
